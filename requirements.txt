@@ -1,0 +1,14 @@
+flask==3.0.3
+pandas==2.1.4
+numpy==1.26.4
+scikit-learn==1.4.2
+xgboost==2.0.3
+imbalanced-learn==0.12.2
+shap==0.45.1
+lime==0.2.0.1
+matplotlib==3.8.4
+seaborn==0.13.2
+sqlalchemy==2.0.30
+pymysql==1.1.1
+optuna==3.6.1
+joblib==1.4.2

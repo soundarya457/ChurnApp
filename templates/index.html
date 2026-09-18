@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Churn Intelligence Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f0f4f9;--sur:#fff;--sur2:#f7f9fc;--bdr:#e2e8f0;--bdr2:#cbd5e1;
+  --t1:#0f172a;--t2:#475569;--t3:#94a3b8;
+  --blue:#2563eb;--blueh:#1d4ed8;--bluelt:#eff6ff;--bluemd:#60a5fa;
+  --red:#ef4444;--redlt:#fef2f2;--amber:#f59e0b;--amberlt:#fffbeb;
+  --green:#16a34a;--greenlt:#f0fdf4;--purple:#7c3aed;--purplelt:#f5f3ff;
+  --teal:#0891b2;--teallt:#ecfeff;
+  --sw:220px;--swc:58px;--th:54px;--r:10px;--rs:6px;
+  --sh:0 1px 3px rgba(0,0,0,.07),0 0 0 1px rgba(0,0,0,.04);
+  --ease:.2s cubic-bezier(.4,0,.2,1);
+}
+body.dark{
+  --bg:#0b0f1a;--sur:#131929;--sur2:#1a2236;--bdr:#1e2d45;--bdr2:#243350;
+  --t1:#e8edf5;--t2:#8fa3bf;--t3:#4d6380;
+  --bluelt:#0d1f3c;--redlt:#2a0a0a;--amberlt:#2a1a00;--greenlt:#071a0e;--purplelt:#1a0a2e;--teallt:#042a33;
+  --sh:0 1px 4px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.03);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Inter','Segoe UI',system-ui,sans-serif;font-size:13.5px;line-height:1.5;background:var(--bg);color:var(--t1);display:flex;height:100vh;overflow:hidden;transition:background var(--ease),color var(--ease)}
+
+/* ── SIDEBAR ── */
+.sb{width:var(--sw);background:var(--sur);border-right:1px solid var(--bdr);display:flex;flex-direction:column;height:100vh;position:fixed;left:0;top:0;z-index:100;transition:width var(--ease);overflow:hidden}
+.sb.col{width:var(--swc)}
+.sb.col .btext,.sb.col .slbl,.sb.col .fttxt,.sb.col .tglbl{display:none}
+.sb.col .ni{justify-content:center;padding:9px}.sb.col .ni span{display:none}
+.sb.col .sbbrand{justify-content:center;padding:14px 0}
+.sb.col .togbtn{padding:9px;justify-content:center}.sb.col .togbtn svg{transform:rotate(180deg)}
+.sbbrand{display:flex;align-items:center;gap:10px;padding:15px 16px;border-bottom:1px solid var(--bdr);min-height:var(--th)}
+.bico{width:30px;height:30px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.bico svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.bname{font-size:13.5px;font-weight:700;color:var(--t1);white-space:nowrap;letter-spacing:-.2px}
+.bsub{font-size:10.5px;color:var(--t3);white-space:nowrap;margin-top:1px}
+.ssec{padding:12px 10px 4px}
+.slbl{font-size:9.5px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:1.2px;padding:0 8px;margin-bottom:4px}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--rs);cursor:pointer;color:var(--t2);font-size:13px;font-weight:500;transition:background var(--ease),color var(--ease);margin-bottom:1px;white-space:nowrap}
+.ni:hover{background:var(--bluelt);color:var(--blue)}.ni.active{background:var(--blue);color:#fff}
+.ni svg{width:15px;height:15px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.togbtn{margin:8px 10px;display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--rs);border:1px solid var(--bdr);background:none;color:var(--t3);font-size:12px;font-weight:500;font-family:inherit;cursor:pointer;transition:all var(--ease);white-space:nowrap}
+.togbtn:hover{border-color:var(--bluemd);color:var(--blue)}
+.togbtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:transform var(--ease)}
+.sbft{margin-top:auto;padding:12px 16px;border-top:1px solid var(--bdr)}
+.fttxt{font-size:11px;color:var(--t3);white-space:nowrap}
+
+/* ── MAIN ── */
+.mw{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden;transition:margin-left var(--ease)}
+.mw.exp{margin-left:var(--swc)}
+
+/* ── TOPBAR ── */
+.topbar{height:var(--th);background:var(--sur);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;padding:0 22px;flex-shrink:0}
+.tbtitle{font-size:14.5px;font-weight:600;color:var(--t1);letter-spacing:-.2px}
+.tbr{display:flex;align-items:center;gap:10px}
+.tbdate{font-size:12px;color:var(--t3)}
+.spill{display:flex;align-items:center;gap:5px;background:var(--greenlt);color:var(--green);font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.thbtn{width:34px;height:34px;border-radius:var(--rs);border:1px solid var(--bdr);background:var(--sur2);color:var(--t2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all var(--ease)}
+.thbtn:hover{border-color:var(--bluemd);color:var(--blue);background:var(--bluelt)}
+.thbtn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── CONTENT ── */
+.pgwrap{flex:1;overflow-y:auto;padding:16px 22px}
+.pg{display:none}.pg.active{display:block}
+.seclbl{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin:0 0 10px}
+
+/* ── KPI ── */
+.kg4{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:11px}
+.kg5{display:grid;grid-template-columns:repeat(5,1fr);gap:11px;margin-bottom:11px}
+.kpi{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);position:relative;overflow:hidden}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kb::after{background:var(--blue)}.kr::after{background:var(--red)}.ka::after{background:var(--amber)}.kg::after{background:var(--green)}.kp::after{background:var(--purple)}.kt::after{background:var(--teal)}
+.klbl{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.9px;margin-bottom:6px}
+.kval{font-size:26px;font-weight:700;line-height:1;margin-bottom:4px;letter-spacing:-1px}
+.vb{color:var(--blue)}.vr{color:var(--red)}.va{color:var(--amber)}.vg{color:var(--green)}.vp{color:var(--purple)}.vt{color:var(--teal)}
+.ksub{font-size:11px;color:var(--t3)}
+
+/* ── CARDS ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:11px}
+.sp2{grid-column:span 2}
+.card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.ch{padding:13px 18px 0}
+.ct{font-size:13.5px;font-weight:600;color:var(--t1);letter-spacing:-.15px}
+.csu{font-size:11.5px;color:var(--t3);margin-top:2px}
+.cb{padding:11px 18px 15px}
+.minirow{display:flex;border-top:1px solid var(--bdr)}
+.mini{flex:1;padding:10px 14px;border-right:1px solid var(--bdr);text-align:center}
+.mini:last-child{border-right:none}
+.mv{font-size:15px;font-weight:700;color:var(--t1)}
+.ml{font-size:10px;color:var(--t3);margin-top:2px;text-transform:uppercase;letter-spacing:.6px}
+
+/* ── TABLE ── */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{padding:9px 16px;text-align:left;font-size:10.5px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;background:var(--sur2);border-bottom:1px solid var(--bdr);white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--bdr);transition:background var(--ease);cursor:pointer}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--bluelt)}
+tbody td{padding:9px 16px;color:var(--t1)}
+
+/* ── BADGES ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:.2px}
+.bh{background:var(--redlt);color:#b91c1c}
+.bm{background:var(--amberlt);color:#92400e}
+.bl{background:var(--greenlt);color:var(--green)}
+.bc{background:var(--redlt);color:#b91c1c}
+.bs{background:var(--bluelt);color:var(--blue)}
+body.dark .bh{color:#fca5a5}body.dark .bm{color:#fcd34d}body.dark .bl{color:#86efac}body.dark .bc{color:#fca5a5}body.dark .bs{color:#93c5fd}
+
+/* ── PROB BAR ── */
+.pbw{display:flex;align-items:center;gap:8px}
+.pbt{flex:1;height:5px;background:var(--bdr);border-radius:3px;overflow:hidden}
+.pbf{height:100%;border-radius:3px}
+.pbp{width:36px;text-align:right;font-size:12px;font-weight:600;color:var(--t1)}
+
+/* ── FILTERS ── */
+.fr{display:flex;gap:6px;margin-bottom:11px}
+.fbtn{padding:5px 12px;border-radius:var(--rs);border:1px solid var(--bdr);background:var(--sur);color:var(--t2);font-size:12px;font-weight:500;font-family:inherit;cursor:pointer;transition:all var(--ease)}
+.fbtn:hover{border-color:var(--bluemd);color:var(--blue)}
+.fbtn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+
+/* ── PAGINATION ── */
+.pgr{display:flex;align-items:center;justify-content:flex-end;gap:3px;padding:10px 16px;border-top:1px solid var(--bdr)}
+.pgb{width:28px;height:28px;border-radius:var(--rs);border:1px solid var(--bdr);background:var(--sur);color:var(--t2);font-size:12px;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all var(--ease)}
+.pgb:hover{border-color:var(--bluemd);color:var(--blue)}
+.pgb.active{background:var(--blue);border-color:var(--blue);color:#fff}
+
+/* ── PLOT ── */
+.pli img{width:100%;display:block;border-radius:4px}
+.plph{padding:36px;text-align:center;color:var(--t3);font-size:13px}
+
+/* ── MODAL ── */
+.mbg{display:none;position:fixed;inset:0;background:rgba(11,15,26,.6);backdrop-filter:blur(2px);z-index:200;align-items:center;justify-content:center}
+.mbg.open{display:flex}
+.modal{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:0 20px 60px rgba(0,0,0,.25);width:500px;max-height:86vh;overflow-y:auto;padding:22px}
+.mhdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.mtit{font-size:15px;font-weight:700;color:var(--t1);letter-spacing:-.2px}
+.mcl{background:none;border:none;cursor:pointer;color:var(--t3);font-size:18px;line-height:1;padding:2px 6px;border-radius:4px}
+.mcl:hover{background:var(--sur2);color:var(--t1)}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}
+.dbox{background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--rs);padding:12px 14px}
+.dlbl{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
+.dval{font-size:18px;font-weight:700;color:var(--t1)}
+.shtit{font-size:10.5px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+.shrow{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.shnm{width:160px;font-size:12px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shbg{flex:1;height:6px;background:var(--bdr);border-radius:3px;overflow:hidden}
+.shfg{height:100%;border-radius:3px}
+.shv{width:58px;text-align:right;font-size:11px;font-weight:600}
+.mdiv{height:1px;background:var(--bdr);margin:4px 0 14px}
+
+/* ── UPLOAD PAGE ── */
+.upg{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px}
+.dropz{border:2px dashed var(--bdr2);border-radius:var(--r);padding:36px 24px;text-align:center;cursor:pointer;transition:all var(--ease);background:var(--sur)}
+.dropz:hover,.dropz.drag{border-color:var(--blue);background:var(--bluelt)}
+.dropz svg{width:38px;height:38px;stroke:var(--t3);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;margin-bottom:12px}
+.dropz:hover svg,.dropz.drag svg{stroke:var(--blue)}
+.dztit{font-size:14px;font-weight:600;color:var(--t1);margin-bottom:5px}
+.dzsub{font-size:12px;color:var(--t3);line-height:1.7}
+.dzfile{font-size:12px;color:var(--blue);font-weight:500;margin-top:10px;min-height:18px}
+input[type=file]{display:none}
+.upbtn{width:100%;padding:10px;border-radius:var(--rs);border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:background var(--ease);margin-top:12px}
+.upbtn:hover{background:var(--blueh)}
+.upbtn:disabled{background:var(--bdr2);cursor:not-allowed;color:var(--t3)}
+
+/* Schema tags */
+.sctag{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:500;margin:3px}
+.sc-cat{background:var(--purplelt);color:var(--purple);border:1px solid rgba(124,58,237,.2)}
+.sc-num{background:var(--teallt);color:var(--teal);border:1px solid rgba(8,145,178,.2)}
+.sc-id{background:var(--bluelt);color:var(--blue);border:1px solid rgba(37,99,235,.2)}
+.sc-tgt{background:var(--redlt);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id{color:#93c5fd}body.dark .sc-tgt{color:#fca5a5}
+
+/* Preview stats */
+.prvst{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ps{background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--rs);padding:12px 14px}
+.psv{font-size:20px;font-weight:700;color:var(--t1);margin-bottom:2px}
+.psl{font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.7px}
+
+/* Pipeline */
+.runbtn{padding:9px 20px;border-radius:var(--rs);border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:background var(--ease);margin-bottom:14px}
+.runbtn:hover{background:var(--blueh)}
+.runbtn:disabled{background:var(--bdr2);cursor:not-allowed;color:var(--t3)}
+.prgwrap{background:var(--sur2);border-radius:20px;height:8px;overflow:hidden;margin-bottom:8px;border:1px solid var(--bdr)}
+.prgbar{height:100%;border-radius:20px;background:var(--blue);transition:width .4s ease;width:0%}
+.stgtxt{font-size:12px;color:var(--t2);margin-bottom:10px;font-weight:500}
+.logbox{background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--rs);padding:12px;max-height:180px;overflow-y:auto;font-family:'Courier New',monospace;font-size:11.5px;color:var(--t2);line-height:1.7}
+.lerr{color:var(--red)}.lok{color:var(--green)}
+.resgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:14px}
+.resbox{background:var(--bluelt);border:1px solid var(--bluemd);border-radius:var(--rs);padding:12px 14px;text-align:center}
+.resv{font-size:20px;font-weight:700;color:var(--blue)}
+.resl{font-size:10.5px;color:var(--t2);margin-top:3px;text-transform:uppercase;letter-spacing:.6px}
+
+/* Steps */
+.steps{display:flex;flex-direction:column;gap:10px}
+.step{display:flex;align-items:flex-start;gap:12px;padding:14px;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--rs)}
+.stpn{width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.stpt{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:3px}
+.stpd{font-size:12px;color:var(--t2);line-height:1.5}
+
+/* Alert */
+.alert{padding:12px 16px;border-radius:var(--rs);font-size:12.5px;font-weight:500;margin-bottom:12px;display:none}
+.alert.show{display:block}
+.aok{background:var(--greenlt);color:var(--green);border:1px solid #86efac}
+.aerr{background:var(--redlt);color:#b91c1c;border:1px solid #fca5a5}
+
+/* Spinner */
+.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--bdr);border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.ldc{text-align:center;padding:28px}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sb" id="sb">
+  <div class="sbbrand">
+    <div class="bico"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+    <div class="btext"><div class="bname">Churn Intelligence</div><div class="bsub">Analytics Platform</div></div>
+  </div>
+  <div class="ssec">
+    <div class="slbl">Analytics</div>
+    <div class="ni active" data-page="dashboard">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>Overview</span>
+    </div>
+    <div class="ni" data-page="customers">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>Customer Risk Table</span>
+    </div>
+    <div class="ni" data-page="plots">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Model Evaluation</span>
+    </div>
+    <div class="ni" data-page="explainability">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      <span>SHAP Explainability</span>
+    </div>
+  </div>
+  <div class="ssec">
+    <div class="slbl">Data</div>
+    <div class="ni" data-page="upload">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span>Upload Dataset</span>
+    </div>
+  </div>
+  <button class="togbtn" id="togbtn">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    <span class="tglbl">Collapse</span>
+  </button>
+  <div class="sbft"><div class="fttxt">ML Pipeline v1.0</div></div>
+</aside>
+
+<!-- MAIN -->
+<div class="mw" id="mw">
+  <header class="topbar">
+    <div class="tbtitle" id="tbtitle">Overview</div>
+    <div class="tbr">
+      <div class="tbdate" id="tbdate"></div>
+      <div class="spill"><div class="sdot"></div>Pipeline Active</div>
+      <button class="thbtn" id="thbtn" title="Toggle light / dark">
+        <svg id="icsun" viewBox="0 0 24 24" style="display:none">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <svg id="icmoon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="pgwrap">
+
+    <!-- OVERVIEW -->
+    <div class="pg active" id="page-dashboard">
+      <div class="seclbl">Core Metrics</div>
+      <div class="kg4">
+        <div class="kpi kb"><div class="klbl">Total Records</div><div class="kval vb" id="k-total">—</div><div class="ksub">In uploaded dataset</div></div>
+        <div class="kpi kr"><div class="klbl">Actual Churn Rate</div><div class="kval vr" id="k-achurn">—</div><div class="ksub">Across all records</div></div>
+        <div class="kpi ka"><div class="klbl">Predicted Churn Rate</div><div class="kval va" id="k-pchurn">—</div><div class="ksub">On scored test set</div></div>
+        <div class="kpi kg"><div class="klbl">Model Accuracy</div><div class="kval vg" id="k-acc">—</div><div class="ksub" id="k-mname">Best model</div></div>
+      </div>
+      <div class="seclbl">Prediction Intelligence</div>
+      <div class="kg5">
+        <div class="kpi kr"><div class="klbl">Avg Age — Churned</div><div class="kval vr" id="k-agec">—</div><div class="ksub">Years old</div></div>
+        <div class="kpi kb"><div class="klbl">Avg Age — Existing</div><div class="kval vb" id="k-agee">—</div><div class="ksub">Years old</div></div>
+        <div class="kpi kt"><div class="klbl">Avg Credit Limit</div><div class="kval vt" id="k-credit">—</div><div class="ksub">All records</div></div>
+        <div class="kpi ka"><div class="klbl">Avg Transactions</div><div class="kval va" id="k-trans">—</div><div class="ksub">Per customer</div></div>
+        <div class="kpi kp"><div class="klbl">Missed Churners</div><div class="kval vp" id="k-fn">—</div><div class="ksub">False negatives</div></div>
+      </div>
+      <div class="g2">
+        <div class="card">
+          <div class="ch"><div class="ct">Model Performance</div><div class="csu">Test set evaluation</div></div>
+          <div class="cb" style="padding-bottom:0"><div style="position:relative;height:175px"><canvas id="cmodel"></canvas></div></div>
+          <div class="minirow">
+            <div class="mini"><div class="mv" id="ms-pr" style="color:var(--blue)">—</div><div class="ml">Precision</div></div>
+            <div class="mini"><div class="mv" id="ms-re" style="color:var(--green)">—</div><div class="ml">Recall</div></div>
+            <div class="mini"><div class="mv" id="ms-ac" style="color:var(--amber)">—</div><div class="ml">Accuracy</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ct">Risk Segment Distribution</div><div class="csu">By churn probability band</div></div>
+          <div class="cb"><div style="position:relative;height:195px"><canvas id="crisk"></canvas></div></div>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="card">
+          <div class="ch"><div class="ct">Churn Probability Distribution</div><div class="csu">Churned vs existing across probability bins</div></div>
+          <div class="cb"><div style="position:relative;height:195px"><canvas id="cproba"></canvas></div></div>
+        </div>
+        <div class="card">
+          <div class="ch"><div class="ct">Top 10 Churn Drivers</div><div class="csu">Mean |SHAP| — ranked by prediction impact</div></div>
+          <div class="cb"><div style="position:relative;height:195px"><canvas id="cshap"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CUSTOMERS -->
+    <div class="pg" id="page-customers">
+      <div class="fr">
+        <button class="fbtn active" data-seg="">All</button>
+        <button class="fbtn" data-seg="High">High Risk</button>
+        <button class="fbtn" data-seg="Medium">Medium Risk</button>
+        <button class="fbtn" data-seg="Low">Low Risk</button>
+      </div>
+      <div class="card">
+        <div class="tw">
+          <table>
+            <thead><tr><th>ID</th><th>Actual</th><th>Predicted</th><th>Churn Probability</th><th>Risk Segment</th></tr></thead>
+            <tbody id="ctbody"><tr><td colspan="5" class="ldc"><div class="spin"></div></td></tr></tbody>
+          </table>
+        </div>
+        <div class="pgr" id="cpag"></div>
+      </div>
+    </div>
+
+    <!-- MODEL EVAL -->
+    <div class="pg" id="page-plots">
+      <div class="g2" style="margin-bottom:11px">
+        <div class="card sp2"><div class="ch"><div class="ct">Model Performance Comparison</div></div><div class="cb pli" id="p-metrics"><div class="plph"><div class="spin"></div></div></div></div>
+      </div>
+      <div class="g2">
+        <div class="card"><div class="ch"><div class="ct">ROC Curves — All Models</div></div><div class="cb pli" id="p-roc"><div class="plph"><div class="spin"></div></div></div></div>
+        <div class="card"><div class="ch"><div class="ct">Confusion Matrices</div></div><div class="cb pli" id="p-conf"><div class="plph"><div class="spin"></div></div></div></div>
+      </div>
+    </div>
+
+    <!-- SHAP -->
+    <div class="pg" id="page-explainability">
+      <div class="card" style="margin-bottom:11px">
+        <div class="ch"><div class="ct">SHAP Summary Plot</div><div class="csu">Each dot = one record — color = feature value, x-axis = impact on churn prediction</div></div>
+        <div class="cb pli" id="p-shs"><div class="plph"><div class="spin"></div></div></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Feature Importance — Mean |SHAP|</div><div class="csu">Average magnitude of each feature's contribution across all scored records</div></div>
+        <div class="cb pli" id="p-shb"><div class="plph"><div class="spin"></div></div></div>
+      </div>
+    </div>
+
+    <!-- UPLOAD -->
+    <div class="pg" id="page-upload">
+      <div class="upg">
+
+        <!-- Left: drop + schema result -->
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card">
+            <div class="ch"><div class="ct">Upload Dataset</div><div class="csu">Any CSV file with a binary target column</div></div>
+            <div class="cb">
+              <div id="aok" class="alert aok"></div>
+              <div id="aerr" class="alert aerr"></div>
+              <div class="dropz" id="dropz">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <div class="dztit">Drop your CSV file here</div>
+                <div class="dzsub">or click to browse<br>Any CSV with a binary churn / target column<br>The app auto-detects all columns</div>
+                <div class="dzfile" id="dzfile"></div>
+              </div>
+              <input type="file" accept=".csv" id="finput"/>
+              <button class="upbtn" id="upbtn" disabled>Upload Dataset</button>
+            </div>
+          </div>
+
+          <!-- Schema card (shown after upload) -->
+          <div class="card" id="schema-card" style="display:none">
+            <div class="ch"><div class="ct">Auto-Detected Schema</div><div class="csu">Columns identified automatically from your file</div></div>
+            <div class="cb" id="schema-body"></div>
+          </div>
+        </div>
+
+        <!-- Right: steps -->
+        <div class="card">
+          <div class="ch"><div class="ct">How It Works</div><div class="csu">Upload any CSV and the app handles everything</div></div>
+          <div class="cb">
+            <div class="steps">
+              <div class="step">
+                <div class="stpn">1</div>
+                <div>
+                  <div class="stpt">Upload any CSV dataset</div>
+                  <div class="stpd">Drop any CSV file — no configuration needed. The app automatically detects your ID column, binary target column, categorical features, and numerical features. Works with any domain.</div>
+                </div>
+              </div>
+              <div class="step">
+                <div class="stpn">2</div>
+                <div>
+                  <div class="stpt">Run the ML pipeline</div>
+                  <div class="stpd">Click Run Pipeline to trigger all 6 automated stages: load into MySQL, feature engineering, SMOTE class balancing, train 4 models (Logistic Regression, Random Forest, XGBoost, MLP), evaluate all models, generate SHAP explanations.</div>
+                </div>
+              </div>
+              <div class="step">
+                <div class="stpn">3</div>
+                <div>
+                  <div class="stpt">Explore predictions</div>
+                  <div class="stpd">Navigate to Overview for KPIs, Customer Risk Table for all predictions, Model Evaluation for ROC and confusion matrix charts, and SHAP Explainability to understand what drives each prediction.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dataset summary (shown after upload) -->
+      <div class="card" id="preview-card" style="display:none;margin-bottom:14px">
+        <div class="ch"><div class="ct">Dataset Summary</div><div class="csu" id="preview-fname"></div></div>
+        <div class="cb"><div class="prvst" id="prvst"></div></div>
+      </div>
+
+      <!-- Pipeline card -->
+      <div class="card">
+        <div class="ch"><div class="ct">ML Pipeline</div><div class="csu">Train and score on your uploaded dataset</div></div>
+        <div class="cb">
+          <button class="runbtn" id="runbtn">Run Full Pipeline</button>
+          <div id="pipeprg" style="display:none">
+            <div class="stgtxt" id="stgtxt">Initialising...</div>
+            <div class="prgwrap"><div class="prgbar" id="prgbar"></div></div>
+            <div class="logbox" id="logbox"></div>
+            <div class="resgrid" id="resgrid" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- pgwrap -->
+</div><!-- mw -->
+
+<!-- MODAL -->
+<div class="mbg" id="modal">
+  <div class="modal">
+    <div class="mhdr"><div class="mtit" id="mtit">Record Detail</div><button class="mcl" id="mcl">&#x2715;</button></div>
+    <div class="dgrid" id="mdtl"></div>
+    <div class="mdiv"></div>
+    <div class="shtit">Top SHAP Features</div>
+    <div id="mshap"></div>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const get=url=>fetch(url).then(r=>r.json());
+
+// Date
+$("tbdate").textContent=new Date().toLocaleDateString("en-GB",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+
+// Theme
+function applyTheme(d){
+  document.body.classList.toggle("dark",d);
+  $("icsun").style.display=d?"block":"none";
+  $("icmoon").style.display=d?"none":"block";
+  localStorage.setItem("ct",d?"1":"0");
+}
+applyTheme(localStorage.getItem("ct")==="1");
+$("thbtn").onclick=()=>applyTheme(!document.body.classList.contains("dark"));
+
+// Sidebar collapse
+let col=localStorage.getItem("cs")==="1";
+function applySB(){$("sb").classList.toggle("col",col);$("mw").classList.toggle("exp",col);localStorage.setItem("cs",col?"1":"0")}
+applySB();
+$("togbtn").onclick=()=>{col=!col;applySB()};
+
+// Navigation
+const pgtit={dashboard:"Overview",customers:"Customer Risk Table",plots:"Model Evaluation",explainability:"SHAP Explainability",upload:"Upload Dataset"};
+document.querySelectorAll(".ni").forEach(n=>{
+  n.addEventListener("click",()=>{
+    const pg=n.dataset.page;
+    document.querySelectorAll(".ni").forEach(x=>x.classList.remove("active"));
+    document.querySelectorAll(".pg").forEach(x=>x.classList.remove("active"));
+    n.classList.add("active");
+    $(`page-${pg}`).classList.add("active");
+    $("tbtitle").textContent=pgtit[pg];
+    if(pg==="customers"&&!custOk)loadCust();
+    if(pg==="plots"&&!plotOk)loadPlots();
+    if(pg==="explainability"&&!xaiOk)loadXAI();
+  });
+});
+
+// Chart defaults
+Chart.defaults.font.family="'Inter','Segoe UI',system-ui,sans-serif";
+Chart.defaults.font.size=11;
+const tc=()=>document.body.classList.contains("dark")?"#8fa3bf":"#64748b";
+const gc=()=>document.body.classList.contains("dark")?"#1e2d45":"#f1f5f9";
+
+function anim(id,target,pre="",suf=""){
+  const el=$(id);if(target==null||target===undefined)return;
+  let v=0;const step=Math.max(target,1)/(800/16);
+  const tick=()=>{v=Math.min(v+step,target);el.textContent=pre+Math.round(v).toLocaleString()+suf;if(v<target)requestAnimationFrame(tick)};
+  requestAnimationFrame(tick);
+}
+
+// Dashboard
+async function loadDashboard(){
+  const s=await get("/api/summary").catch(()=>({}));
+  if(!s.total_raw)return;
+
+  anim("k-total",s.total_raw);
+  $("k-achurn").textContent=s.actual_churn_rate!=null?s.actual_churn_rate+"%":"N/A";
+  $("k-pchurn").textContent=s.churn_rate+"%";
+  $("k-acc").textContent=((s.accuracy||0)*100).toFixed(1)+"%";
+  $("k-mname").textContent=s.best_model||"—";
+  $("k-agec").textContent=s.avg_age_churned!=null?s.avg_age_churned:"N/A";
+  $("k-agee").textContent=s.avg_age_existing!=null?s.avg_age_existing:"N/A";
+  $("k-credit").textContent=s.avg_credit_limit!=null?"$"+Number(s.avg_credit_limit).toLocaleString():"N/A";
+  $("k-trans").textContent=s.avg_trans_ct!=null?s.avg_trans_ct:"N/A";
+  anim("k-fn",s.false_negatives||0);
+  $("ms-pr").textContent=((s.precision||0)*100).toFixed(1)+"%";
+  $("ms-re").textContent=((s.recall||0)*100).toFixed(1)+"%";
+  $("ms-ac").textContent=((s.accuracy||0)*100).toFixed(1)+"%";
+
+  const t=tc(),g=gc();
+
+  new Chart($("cmodel"),{
+    type:"bar",
+    data:{labels:["Accuracy","Precision","Recall"],datasets:[{
+      data:[+((s.accuracy||0)*100).toFixed(1),+((s.precision||0)*100).toFixed(1),+((s.recall||0)*100).toFixed(1)],
+      backgroundColor:["rgba(245,158,11,.8)","rgba(37,99,235,.8)","rgba(22,163,74,.8)"],borderRadius:5
+    }]},
+    options:{animation:{duration:900,easing:"easeOutQuart"},plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:t},grid:{display:false}},y:{min:0,max:100,ticks:{color:t,callback:v=>v+"%"},grid:{color:g}}}}
+  });
+
+  const rd=await get("/api/risk_distribution").catch(()=>[]);
+  new Chart($("crisk"),{
+    type:"doughnut",
+    data:{labels:rd.map(r=>r.risk_segment),datasets:[{
+      data:rd.map(r=>r.count),
+      backgroundColor:["#ef4444","#f59e0b","#16a34a"],
+      borderWidth:3,borderColor:document.body.classList.contains("dark")?"#131929":"#fff"
+    }]},
+    options:{animation:{animateRotate:true,duration:1000,easing:"easeOutQuart"},
+      plugins:{legend:{position:"right",labels:{color:t,padding:14,font:{size:12,weight:"500"}}}},cutout:"65%"}
+  });
+
+  const pd=await get("/api/churn_by_proba").catch(()=>({labels:[],churn:[],no_churn:[]}));
+  new Chart($("cproba"),{
+    type:"bar",
+    data:{labels:pd.labels,datasets:[
+      {label:"Churned",data:pd.churn,backgroundColor:"rgba(239,68,68,.72)",borderRadius:3},
+      {label:"Existing",data:pd.no_churn,backgroundColor:"rgba(37,99,235,.5)",borderRadius:3}
+    ]},
+    options:{animation:{duration:900,easing:"easeOutQuart"},
+      plugins:{legend:{labels:{color:t,padding:12,font:{size:11}}}},
+      scales:{x:{ticks:{color:t,maxRotation:45,font:{size:9}},grid:{display:false}},y:{ticks:{color:t},grid:{color:g}}}}
+  });
+
+  const sd=await get("/api/top_features").catch(()=>[]);
+  new Chart($("cshap"),{
+    type:"bar",
+    data:{labels:sd.map(d=>d.feature_name),datasets:[{
+      label:"Mean |SHAP|",data:sd.map(d=>d.mean_abs_shap),
+      backgroundColor:sd.map((_,i)=>`rgba(37,99,235,${1-i*0.07})`),borderRadius:4
+    }]},
+    options:{indexAxis:"y",animation:{duration:1100,easing:"easeOutQuart"},plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:t,font:{size:10}},grid:{color:g}},
+              y:{ticks:{color:document.body.classList.contains("dark")?"#e8edf5":"#334155",font:{size:10.5}},grid:{display:false}}}}
+  });
+}
+loadDashboard();
+
+// Customers
+let custOk=false,curPg=1,curSeg="";
+async function loadCust(pg=1,seg=""){
+  custOk=true;curPg=pg;curSeg=seg;
+  const tb=$("ctbody");
+  tb.innerHTML='<tr><td colspan="5" class="ldc"><div class="spin"></div></td></tr>';
+  const d=await get(`/api/customers?page=${pg}&per_page=20&segment=${seg}`).catch(()=>({customers:[],total:0}));
+  tb.innerHTML=d.customers.map(c=>{
+    const pr=(c.churn_proba*100).toFixed(1);
+    const cl=c.churn_proba>.7?"#ef4444":c.churn_proba>.4?"#f59e0b":"#16a34a";
+    return `<tr onclick="showRec('${c.CLIENTNUM}')">
+      <td style="font-weight:600">${c.CLIENTNUM}</td>
+      <td><span class="badge ${c.churn_actual?'bc':'bs'}">${c.churn_actual?'Churned':'Existing'}</span></td>
+      <td><span class="badge ${c.churn_predicted?'bc':'bs'}">${c.churn_predicted?'Churn':'Stay'}</span></td>
+      <td><div class="pbw"><div class="pbt"><div class="pbf" style="width:${pr}%;background:${cl}"></div></div><div class="pbp">${pr}%</div></div></td>
+      <td><span class="badge b${c.risk_segment[0].toLowerCase()}">${c.risk_segment}</span></td>
+    </tr>`;
+  }).join("")||'<tr><td colspan="5" style="text-align:center;padding:28px;color:var(--t3)">No records found</td></tr>';
+  const pages=Math.ceil(d.total/20),pa=$("cpag");pa.innerHTML="";
+  Array.from({length:Math.min(pages,8)},(_,i)=>i+1).forEach(p=>{
+    const b=document.createElement("button");
+    b.className="pgb"+(p===pg?" active":"");b.textContent=p;
+    b.onclick=()=>loadCust(p,curSeg);pa.appendChild(b);
+  });
+}
+document.querySelectorAll(".fbtn").forEach(b=>{
+  b.addEventListener("click",()=>{
+    document.querySelectorAll(".fbtn").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");loadCust(1,b.dataset.seg);
+  });
+});
+
+// Modal
+async function showRec(id){
+  $("modal").classList.add("open");$("mtit").textContent=`Record ${id}`;
+  $("mdtl").innerHTML='<div style="grid-column:span 2;text-align:center;padding:20px"><div class="spin"></div></div>';
+  $("mshap").innerHTML="";
+  const data=await get(`/api/customer/${id}`).catch(()=>({}));
+  const p=data.prediction||{};
+  const pr=((p.churn_proba||0)*100).toFixed(1);
+  const pc=p.churn_proba>.7?"#ef4444":p.churn_proba>.4?"#f59e0b":"#16a34a";
+  $("mdtl").innerHTML=`
+    <div class="dbox"><div class="dlbl">Churn Probability</div><div class="dval" style="color:${pc}">${pr}%</div></div>
+    <div class="dbox"><div class="dlbl">Risk Segment</div><div class="dval">${p.risk_segment||"—"}</div></div>
+    <div class="dbox"><div class="dlbl">Predicted</div><div class="dval">${p.churn_predicted?"Will Churn":"Will Stay"}</div></div>
+    <div class="dbox"><div class="dlbl">Actual</div><div class="dval">${p.churn_actual?"Churned":"Existing"}</div></div>`;
+  if(data.shap&&data.shap.length){
+    const mx=Math.max(...data.shap.map(s=>Math.abs(s.shap_value)));
+    $("mshap").innerHTML=data.shap.map(s=>{
+      const pct=(Math.abs(s.shap_value)/mx*100).toFixed(0);
+      const col=s.shap_value>0?"#ef4444":"#2563eb";
+      return `<div class="shrow"><div class="shnm" title="${s.feature_name}">${s.feature_name}</div><div class="shbg"><div class="shfg" style="width:${pct}%;background:${col}"></div></div><div class="shv" style="color:${col}">${s.shap_value>0?"+":""}${s.shap_value.toFixed(4)}</div></div>`;
+    }).join("");
+  }
+}
+$("mcl").onclick=()=>$("modal").classList.remove("open");
+$("modal").addEventListener("click",e=>{if(e.target.id==="modal")$("modal").classList.remove("open")});
+
+// Plots
+let plotOk=false;
+async function loadPlots(){
+  plotOk=true;
+  const l=async(n,id)=>{
+    const d=await get(`/api/plots/${n}`).catch(()=>({}));
+    $(id).innerHTML=d.img?`<img src="data:image/png;base64,${d.img}">`:`<div class="plph">Run the pipeline to generate this chart.</div>`;
+  };
+  await Promise.all([l("metrics_comparison","p-metrics"),l("roc_curves","p-roc"),l("confusion_matrices","p-conf")]);
+}
+
+// XAI
+let xaiOk=false;
+async function loadXAI(){
+  xaiOk=true;
+  const l=async(n,id)=>{
+    const d=await get(`/api/plots/${n}`).catch(()=>({}));
+    $(id).innerHTML=d.img?`<img src="data:image/png;base64,${d.img}">`:`<div class="plph">Run the pipeline to generate SHAP plots.</div>`;
+  };
+  await Promise.all([l("shap_summary","p-shs"),l("shap_bar","p-shb")]);
+}
+
+// Upload
+let selFile=null;
+const dropz=$("dropz"),fi=$("finput"),upbtn=$("upbtn");
+dropz.addEventListener("click",()=>fi.click());
+dropz.addEventListener("dragover",e=>{e.preventDefault();dropz.classList.add("drag")});
+dropz.addEventListener("dragleave",()=>dropz.classList.remove("drag"));
+dropz.addEventListener("drop",e=>{
+  e.preventDefault();dropz.classList.remove("drag");
+  if(e.dataTransfer.files[0])setFile(e.dataTransfer.files[0]);
+});
+fi.addEventListener("change",()=>{if(fi.files[0])setFile(fi.files[0])});
+
+function setFile(f){
+  selFile=f;
+  $("dzfile").textContent=f.name+" ("+fmtB(f.size)+")";
+  upbtn.disabled=false;
+  hideAlerts();
+}
+function fmtB(b){if(b<1024)return b+"B";if(b<1048576)return(b/1024).toFixed(1)+"KB";return(b/1048576).toFixed(1)+"MB"}
+function hideAlerts(){$("aok").classList.remove("show");$("aerr").classList.remove("show")}
+
+upbtn.addEventListener("click",async()=>{
+  if(!selFile)return;
+  hideAlerts();upbtn.disabled=true;upbtn.textContent="Uploading...";
+  const fd=new FormData();fd.append("file",selFile);
+  try{
+    const r=await fetch("/api/upload_dataset",{method:"POST",body:fd});
+    const d=await r.json();
+    upbtn.textContent="Upload Dataset";
+    if(d.error){$("aerr").textContent=d.error;$("aerr").classList.add("show");upbtn.disabled=false;return}
+
+    $("aok").textContent=`Uploaded successfully — ${d.rows.toLocaleString()} rows, ${d.columns} columns detected.`;
+    $("aok").classList.add("show");
+    upbtn.disabled=false;
+
+    // Show auto-detected schema
+    $("schema-card").style.display="block";
+    $("schema-body").innerHTML=`
+      <div style="margin-bottom:10px">
+        <span class="sctag sc-tgt">Target: ${d.target_col} = "${d.target_pos}"</span>
+        ${d.id_col?`<span class="sctag sc-id">ID: ${d.id_col}</span>`:""}
+      </div>
+      <div style="margin-bottom:6px;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.7px">Categorical Features (${(d.cat_cols||[]).length})</div>
+      <div style="margin-bottom:10px">${(d.cat_cols||[]).map(c=>`<span class="sctag sc-cat">${c}</span>`).join("")||'<span style="color:var(--t3);font-size:12px">None detected</span>'}</div>
+      <div style="margin-bottom:6px;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.7px">Numerical Features (${(d.num_cols||[]).length})</div>
+      <div>${(d.num_cols||[]).map(c=>`<span class="sctag sc-num">${c}</span>`).join("")||'<span style="color:var(--t3);font-size:12px">None detected</span>'}</div>`;
+
+    // Dataset summary stats
+    $("preview-card").style.display="block";
+    $("preview-fname").textContent=d.filename;
+    $("prvst").innerHTML=`
+      <div class="ps"><div class="psv">${d.rows.toLocaleString()}</div><div class="psl">Total Rows</div></div>
+      <div class="ps"><div class="psv">${d.columns}</div><div class="psl">Columns</div></div>
+      <div class="ps"><div class="psv" style="color:var(--red)">${d.churn_count.toLocaleString()}</div><div class="psl">Churn Records</div></div>
+      <div class="ps"><div class="psv" style="color:var(--red)">${d.churn_rate}%</div><div class="psl">Churn Rate</div></div>
+      <div class="ps"><div class="psv" style="color:var(--blue)">${(d.cat_cols||[]).length}</div><div class="psl">Categorical Cols</div></div>
+      <div class="ps"><div class="psv" style="color:var(--teal)">${(d.num_cols||[]).length}</div><div class="psl">Numerical Cols</div></div>`;
+  }catch(e){
+    upbtn.textContent="Upload Dataset";upbtn.disabled=false;
+    $("aerr").textContent="Upload failed: "+e.message;$("aerr").classList.add("show");
+  }
+});
+
+// Pipeline
+let polling=null;
+$("runbtn").addEventListener("click",async()=>{
+  $("runbtn").disabled=true;$("runbtn").textContent="Starting...";
+  $("pipeprg").style.display="block";$("resgrid").style.display="none";
+  $("logbox").innerHTML="";$("prgbar").style.width="0%";$("stgtxt").textContent="Initialising...";
+  const r=await fetch("/api/run_pipeline",{method:"POST"}).then(x=>x.json()).catch(e=>({error:e.message}));
+  if(r.error){
+    $("stgtxt").textContent="Error: "+r.error;
+    $("runbtn").disabled=false;$("runbtn").textContent="Run Full Pipeline";return;
+  }
+  polling=setInterval(pollStatus,1500);
+});
+
+async function pollStatus(){
+  const s=await get("/api/pipeline_status").catch(()=>({}));
+  $("prgbar").style.width=(s.progress||0)+"%";
+  $("stgtxt").textContent=s.stage||"Running...";
+  $("logbox").innerHTML=(s.log||[]).map((l,i)=>{
+    const cls=l.startsWith("ERROR")?"lerr":(i===(s.log.length-1)&&!s.running?"lok":"");
+    return `<div class="${cls}">${l}</div>`;
+  }).join("");
+  $("logbox").scrollTop=$("logbox").scrollHeight;
+
+  if(!s.running){
+    clearInterval(polling);
+    $("runbtn").disabled=false;$("runbtn").textContent="Run Full Pipeline";
+    if(s.done){
+      $("stgtxt").textContent="Pipeline complete — navigate to Overview to see results.";
+      const sum=await get("/api/summary").catch(()=>({}));
+      if(sum.total_scored){
+        $("resgrid").style.display="grid";
+        $("resgrid").innerHTML=`
+          <div class="resbox"><div class="resv">${sum.total_scored.toLocaleString()}</div><div class="resl">Records Scored</div></div>
+          <div class="resbox"><div class="resv">${sum.churn_rate}%</div><div class="resl">Predicted Churn</div></div>
+          <div class="resbox"><div class="resv">${((sum.accuracy||0)*100).toFixed(1)}%</div><div class="resl">Accuracy</div></div>
+          <div class="resbox"><div class="resv">${(sum.high_risk||0).toLocaleString()}</div><div class="resl">High Risk</div></div>`;
+      }
+    }else if(s.error){
+      $("stgtxt").textContent="Pipeline failed — check the log above for details.";
+    }
+  }
+}
+</script>
+</body>
+</html>
