@@ -12,3 +12,4 @@ sqlalchemy==2.0.30
 pymysql==1.1.1
 optuna==3.6.1
 joblib==1.4.2
+gunicorn==21.2.0
