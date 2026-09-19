@@ -1,6 +1,6 @@
 """
 preprocess.py — Dynamic feature engineering + SMOTE.
-Works entirely from SCHEMA dict populated by ingest.py.
+Works with any schema. Adds primary keys for Aiven MySQL compatibility.
 """
 import pandas as pd
 import numpy as np
@@ -22,13 +22,6 @@ def load_raw() -> pd.DataFrame:
 
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    1. Encode target → binary 0/1
-    2. Ordinal-encode categoricals
-    3. Fill nulls
-    4. Add generic engineered features when standard columns detected
-    5. Write features table to MySQL
-    """
     id_col     = SCHEMA["id_col"]
     target_col = SCHEMA["target_col"]
     pos_label  = SCHEMA["target_positive"]
@@ -51,8 +44,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         le = LabelEncoder()
         df[col] = le.fit_transform(df[col].astype(str))
 
-    # Fill numeric nulls with median
-            # Fill numeric nulls with median
+    # Fill numeric nulls
     for col in num_cols:
         if col not in df.columns:
             continue
@@ -60,7 +52,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         median_val = df[col].median()
         df[col] = df[col].fillna(median_val if not pd.isna(median_val) else 0)
 
-    # Final safety — fill any remaining NaNs in the whole dataframe
+    # Final safety fill
     for col in df.columns:
         if col in ["churn"] + ([id_col] if id_col else []):
             continue
@@ -70,61 +62,83 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
             else:
                 df[col] = df[col].fillna(0)
 
-    # ── Opportunistic feature engineering ──────────────────────
-    # These fire only when the expected column names are present.
+    # Engineered features
     c = df.columns.tolist()
-
     if "Total_Trans_Amt" in c and "Total_Trans_Ct" in c:
         df["Trans_Amt_per_Ct"] = np.where(
             df["Total_Trans_Ct"] > 0,
-            df["Total_Trans_Amt"] / df["Total_Trans_Ct"], 0
-        )
-
+            df["Total_Trans_Amt"] / df["Total_Trans_Ct"], 0)
     if "Total_Revolving_Bal" in c and "Credit_Limit" in c:
         df["Credit_Usage_Pct"] = np.where(
             df["Credit_Limit"] > 0,
-            df["Total_Revolving_Bal"] / df["Credit_Limit"], 0
-        )
-
+            df["Total_Revolving_Bal"] / df["Credit_Limit"], 0)
     if "Months_Inactive_12_mon" in c and "Contacts_Count_12_mon" in c:
         df["Inactivity_Score"] = df["Months_Inactive_12_mon"] * df["Contacts_Count_12_mon"]
-
     if "Total_Relationship_Count" in c and "Total_Trans_Ct" in c:
         df["Engagement_Score"] = df["Total_Relationship_Count"] * df["Total_Trans_Ct"]
 
-    log.info(f"  Feature columns: {[c for c in df.columns if c not in [id_col, 'churn']]}")
     return df
 
 
 def save_features(df: pd.DataFrame):
-    """Write engineered features back to MySQL."""
-    engine = create_engine(DB_URL, echo=False)
+    """Write features to MySQL with explicit primary key (required by Aiven)."""
+    engine  = create_engine(DB_URL, echo=False)
+    id_col  = SCHEMA.get("id_col")
+
+    # Decide primary key column
+    if id_col and id_col in df.columns:
+        pk_col = id_col
+    else:
+        # Add a synthetic integer primary key
+        df = df.copy()
+        df.insert(0, "_row_id", range(1, len(df) + 1))
+        pk_col = "_row_id"
+
+    # Build column definitions
+    def col_type(series, col_name):
+        if col_name == pk_col:
+            if pd.api.types.is_integer_dtype(series.dtype):
+                return "BIGINT PRIMARY KEY"
+            else:
+                return "VARCHAR(100) PRIMARY KEY"
+        if pd.api.types.is_integer_dtype(series.dtype):
+            return "BIGINT"
+        if pd.api.types.is_float_dtype(series.dtype):
+            return "DOUBLE"
+        return "VARCHAR(255)"
+
+    col_defs = [f"`{col}` {col_type(df[col], col)}" for col in df.columns]
+    ddl      = f"CREATE TABLE features ({', '.join(col_defs)})"
+
     with engine.begin() as conn:
         conn.execute(text("DROP TABLE IF EXISTS features"))
-    df.to_sql("features", con=engine, if_exists="replace",
+        conn.execute(text(ddl))
+
+    # Insert rows
+    df.to_sql("features", con=engine, if_exists="append",
               index=False, chunksize=500, method="multi")
-    log.info(f"  Written {len(df):,} rows to features table ✓")
+    log.info(f"  Written {len(df):,} rows to features ✓")
 
 
 def split_and_balance(df: pd.DataFrame):
     id_col = SCHEMA["id_col"]
     drop   = ["churn"] + ([id_col] if id_col and id_col in df.columns else [])
-    X      = df.drop(columns=drop)
-    y      = df["churn"]
+    # Also drop synthetic key if added
+    if "_row_id" in df.columns:
+        drop.append("_row_id")
+    X = df.drop(columns=[c for c in drop if c in df.columns])
+    y = df["churn"]
     feature_names = X.columns.tolist()
 
-    # Fill any remaining NaN values before SMOTE
+    # Fill any leftover NaNs
     for col in X.columns:
         if X[col].isnull().any():
-            if X[col].dtype == "object":
-                X[col] = X[col].fillna(X[col].mode()[0] if not X[col].mode().empty else "Unknown")
-            else:
-                X[col] = X[col].fillna(X[col].median())
+            X[col] = X[col].fillna(X[col].median() if pd.api.types.is_numeric_dtype(X[col]) else "Unknown")
 
-    # Drop any rows where y is NaN
+    # Drop rows with NaN target
     mask = y.notna()
-    X = X[mask]
-    y = y[mask]
+    X    = X[mask]
+    y    = y[mask]
 
     log.info(f"  Class distribution before SMOTE: {y.value_counts().to_dict()}")
 
