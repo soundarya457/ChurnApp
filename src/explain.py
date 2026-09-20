@@ -74,7 +74,7 @@ def build_shap_table(sv, X_arr, feature_names, client_ids):
 def run(best_name, best_model, X_train, X_test, feature_names, client_ids):
     X_train_arr = transform(best_model, X_train)
     X_test_arr  = transform(best_model, X_test)
-    sample_n    = min(500, len(X_train_arr))
+    sample_n    = min(100, len(X_train_arr))
     X_sample    = X_train_arr[:sample_n]
     ids_sample  = client_ids[:sample_n]
 

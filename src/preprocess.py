@@ -146,7 +146,18 @@ def split_and_balance(df: pd.DataFrame):
         X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
     )
 
-    smote = SMOTE(random_state=RANDOM_STATE)
+        # Sample down before SMOTE to save RAM on free tier
+    MAX_ROWS = 2000
+    if len(X_train) > MAX_ROWS:
+        log.info(f"  Sampling {MAX_ROWS} rows before SMOTE for speed")
+        import numpy as np
+        idx = np.random.RandomState(RANDOM_STATE).choice(
+            len(X_train), MAX_ROWS, replace=False
+        )
+        X_train = X_train.iloc[idx] if hasattr(X_train, "iloc") else X_train[idx]
+        y_train = y_train.iloc[idx] if hasattr(y_train, "iloc") else y_train[idx]
+
+    smote = SMOTE(random_state=RANDOM_STATE, k_neighbors=3)
     X_train_b, y_train_b = smote.fit_resample(X_train, y_train)
     log.info(f"  After SMOTE: {pd.Series(y_train_b).value_counts().to_dict()}")
     log.info(f"  Train: {len(X_train_b):,} | Test: {len(X_test):,}")
