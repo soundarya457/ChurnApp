@@ -1,10 +1,6 @@
 """
 ingest.py — Load any CSV → MySQL raw_data table.
-Auto-detects:
-  • ID column (high-cardinality unique integer col)
-  • Target column (binary string col with 2 unique values)
-  • Categorical vs numerical columns
-  • Columns to drop (near-zero variance, all-unique text)
+Auto-detects schema with improved target column detection.
 """
 import re
 import pandas as pd
@@ -13,7 +9,6 @@ from sqlalchemy import create_engine, text
 from src.config import DB_URL, SCHEMA
 import logging
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
 
 
@@ -21,49 +16,88 @@ log = logging.getLogger(__name__)
 
 def detect_id_col(df: pd.DataFrame) -> str | None:
     """Return the column most likely to be a row identifier."""
-    # Priority 1: column name contains 'id', 'num', 'clientnum', 'customerid'
-    id_keywords = re.compile(r"(^id$|clientnum|customerid|cust.*id|account.*id|member.*id)", re.I)
+    id_keywords = re.compile(
+        r"(^id$|clientnum|customerid|cust.*id|account.*id|member.*id|rowid|row_id)",
+        re.I
+    )
     for col in df.columns:
         if id_keywords.search(col):
-            if df[col].nunique() / len(df) > 0.95:
+            if df[col].nunique() / len(df) > 0.90:
                 return col
-    # Priority 2: integer column where every value is unique
+    # Integer column where every value is unique
     for col in df.select_dtypes(include="number").columns:
         if df[col].nunique() == len(df):
             return col
     return None
 
 
-def detect_target_col(df: pd.DataFrame, id_col: str | None) -> tuple[str | None, str | None]:
+def detect_target_col(df: pd.DataFrame, id_col: str | None) -> tuple:
     """
     Return (target_col, positive_label).
-    Looks for a binary string/object column — the minority class is the positive label.
+    Priority:
+      1. Columns with churn-related names
+      2. Binary integer columns (0/1) — minority class = positive
+      3. Binary string columns — minority class = positive
+    Explicitly skips demographic columns (Gender, Geography etc.)
     """
     skip = {id_col} if id_col else set()
+
+    # Columns that are almost certainly NOT the target
+    demographic_pattern = re.compile(
+        r"^(gender|sex|geography|country|region|state|city|name|surname|"
+        r"firstname|lastname|email|phone|address|zip|postal)$",
+        re.I
+    )
+
+    # Priority 1: column name strongly suggests churn/target
+    churn_pattern = re.compile(
+        r"(churn|attrition|exited|left|cancelled|canceled|churned|"
+        r"target|label|class|outcome|default|fraud|converted)",
+        re.I
+    )
+
+    # Check named churn columns first
+    for col in df.columns:
+        if col in skip or demographic_pattern.match(col):
+            continue
+        if churn_pattern.search(col):
+            vals = df[col].dropna().unique()
+            if len(vals) == 2:
+                # For string binary: minority = positive
+                counts = df[col].value_counts()
+                positive = counts.index[-1]
+                log.info(f"  Detected target (name match): '{col}' | positive='{positive}'")
+                return col, str(positive)
+            # Handle 0/1 numeric
+            if set(map(int, vals)).issubset({0, 1}):
+                log.info(f"  Detected binary target (name match): '{col}' | positive='1'")
+                return col, "1"
+
+    # Priority 2: binary integer 0/1 columns (skip demographics)
+    for col in df.select_dtypes(include="number").columns:
+        if col in skip or demographic_pattern.match(col):
+            continue
+        vals = set(df[col].dropna().unique())
+        if vals.issubset({0, 1, 0.0, 1.0}):
+            log.info(f"  Detected binary int target: '{col}' | positive='1'")
+            return col, "1"
+
+    # Priority 3: binary string columns (skip demographics)
     for col in df.select_dtypes(include=["object", "category"]).columns:
-        if col in skip:
+        if col in skip or demographic_pattern.match(col):
             continue
         vals = df[col].dropna().unique()
         if len(vals) == 2:
-            # Minority class = positive (churn)
-            counts = df[col].value_counts()
-            positive = counts.index[-1]   # least frequent
-            log.info(f"  Detected target: '{col}' | positive class: '{positive}'")
+            counts  = df[col].value_counts()
+            positive = counts.index[-1]
+            log.info(f"  Detected binary string target: '{col}' | positive='{positive}'")
             return col, str(positive)
-    # Fallback: binary integer column (0/1)
-    for col in df.select_dtypes(include="number").columns:
-        if col in skip:
-            continue
-        vals = df[col].dropna().unique()
-        if set(vals).issubset({0, 1, 0.0, 1.0}):
-            log.info(f"  Detected binary target: '{col}'")
-            return col, "1"
+
     return None, None
 
 
 def detect_col_types(df: pd.DataFrame, id_col: str | None, target_col: str | None):
-    """Split columns into categorical and numerical, skipping id and target."""
-    skip = {c for c in [id_col, target_col] if c}
+    skip     = {c for c in [id_col, target_col] if c}
     cat_cols, num_cols, drop_cols = [], [], []
 
     for col in df.columns:
@@ -72,13 +106,14 @@ def detect_col_types(df: pd.DataFrame, id_col: str | None, target_col: str | Non
         n_unique = df[col].nunique()
         n_rows   = len(df)
 
-        # Drop: all unique (likely free-text), zero-variance
-        if n_unique == n_rows or n_unique <= 1:
+        if n_unique == n_rows and df[col].dtype == "object":
+            drop_cols.append(col)
+            continue
+        if n_unique <= 1:
             drop_cols.append(col)
             continue
 
-        dtype = df[col].dtype
-        if dtype == "object" or str(dtype) == "category":
+        if df[col].dtype == "object" or str(df[col].dtype) == "category":
             cat_cols.append(col)
         else:
             num_cols.append(col)
@@ -87,7 +122,6 @@ def detect_col_types(df: pd.DataFrame, id_col: str | None, target_col: str | Non
 
 
 def detect_schema(df: pd.DataFrame):
-    """Run full auto-detection and populate SCHEMA dict."""
     id_col              = detect_id_col(df)
     target_col, pos_lbl = detect_target_col(df, id_col)
     cat_cols, num_cols, drop_cols = detect_col_types(df, id_col, target_col)
@@ -116,27 +150,40 @@ def _pandas_dtype_to_sql(dtype) -> str:
 
 
 def create_raw_table(df: pd.DataFrame, engine):
-    """Drop & recreate raw_data table to match the CSV schema exactly."""
-    
-    # Truncate column names longer than 64 chars (MySQL limit)
+    """Drop & recreate raw_data with primary key (required by Aiven)."""
+
+    # Truncate column names > 64 chars
     rename_map = {}
     for col in df.columns:
         if len(col) > 64:
             short = col[:64]
             rename_map[col] = short
-            log.warning(f"  Column name truncated: '{col}' → '{short}'")
+            log.warning(f"  Column truncated: '{col}' → '{short}'")
     if rename_map:
         df.rename(columns=rename_map, inplace=True)
-    
+
+    id_col = SCHEMA["id_col"]
+
+    # Add synthetic PK if no ID col
+    if not id_col or id_col not in df.columns:
+        df.insert(0, "_row_id", range(1, len(df) + 1))
+        SCHEMA["id_col"] = "_row_id"
+        id_col = "_row_id"
+
     col_defs = []
-    id_col   = SCHEMA["id_col"]
     for col in df.columns:
         safe     = f"`{col}`"
         sql_type = _pandas_dtype_to_sql(df[col].dtype)
-        pk       = " PRIMARY KEY" if col == id_col else ""
-        col_defs.append(f"  {safe} {sql_type}{pk}")
+        if col == id_col:
+            sql_type = "VARCHAR(100)" if sql_type == "VARCHAR(255)" else sql_type
+            col_defs.append(f"  {safe} {sql_type} PRIMARY KEY")
+        else:
+            col_defs.append(f"  {safe} {sql_type}")
 
-    ddl = "DROP TABLE IF EXISTS raw_data;\nCREATE TABLE raw_data (\n" + ",\n".join(col_defs) + "\n);"
+    ddl = ("DROP TABLE IF EXISTS raw_data;\n"
+           "CREATE TABLE raw_data (\n" +
+           ",\n".join(col_defs) + "\n);")
+
     with engine.begin() as conn:
         for stmt in ddl.split(";"):
             s = stmt.strip()
@@ -157,7 +204,7 @@ def load_csv(csv_path) -> pd.DataFrame:
 def validate(df: pd.DataFrame):
     nulls = df.isnull().sum()
     if nulls.any():
-        log.warning(f"Nulls found:\n{nulls[nulls > 0]}")
+        log.warning(f"Nulls: {nulls[nulls > 0].to_dict()}")
     id_col = SCHEMA["id_col"]
     if id_col and id_col in df.columns:
         df[id_col] = df[id_col].astype(str)
@@ -168,7 +215,6 @@ def validate(df: pd.DataFrame):
 
 
 def to_mysql(df: pd.DataFrame, engine):
-    # Drop schema-detected junk cols before inserting
     cols_to_drop = [c for c in SCHEMA["drop_cols"] if c in df.columns]
     if cols_to_drop:
         df = df.drop(columns=cols_to_drop)
@@ -180,20 +226,22 @@ def to_mysql(df: pd.DataFrame, engine):
               index=False, chunksize=500, method="multi")
     log.info(f"  Inserted {len(df):,} rows into raw_data ✓")
 
+
 def run(csv_path=None):
     from src.config import DATA_DIR
     if csv_path is None:
-        csvs = sorted(DATA_DIR.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+        csvs = sorted(DATA_DIR.glob("*.csv"),
+                      key=lambda p: p.stat().st_mtime, reverse=True)
         if not csvs:
             raise FileNotFoundError(f"No CSV found in {DATA_DIR}")
         csv_path = csvs[0]
 
     df = load_csv(csv_path)
 
-    # Drop columns with names too long for MySQL (> 64 chars)
+    # Drop columns with names > 64 chars (MySQL limit)
     long_cols = [c for c in df.columns if len(c) > 64]
     if long_cols:
-        log.info(f"  Dropping {len(long_cols)} columns with names > 64 chars: {long_cols}")
+        log.info(f"  Dropping {len(long_cols)} cols with names > 64 chars")
         df.drop(columns=long_cols, inplace=True)
 
     detect_schema(df)

@@ -275,7 +275,7 @@ def api_run_pipeline():
             # Stage 2 — Preprocess
             log_s("Stage 2/6 — Feature engineering + SMOTE balancing...", "Preprocessing", 20)
             preprocess = fresh("src.preprocess")
-            X_train, X_test, y_train, y_test, feature_names = preprocess.run()
+            X_train, X_test, y_train, y_test, feature_names, X_full = preprocess.run()
             log_s(f"  {len(feature_names)} features | Train: {len(X_train):,} | Test: {len(X_test):,}", progress=35)
 
             # Fetch IDs
@@ -313,8 +313,14 @@ def api_run_pipeline():
             # Stage 6 — Predict
             log_s("Stage 6/6 — Writing predictions to MySQL...", "Saving", 91)
             predict = fresh("src.predict")
-            pred_df = predict.run(best_name, best_model, X_test, y_test, test_ids, shap_df)
-            log_s(f"  {len(pred_df):,} customers scored and saved.", progress=100)
+            # Load full y for all-row prediction
+            from sqlalchemy import create_engine as CE2
+            eng_full = CE2(DB_URL)
+            features_full = pd.read_sql("SELECT churn FROM features", eng_full)
+            y_full = features_full["churn"]
+            pred_df = predict.run(best_name, best_model, X_test, y_test, test_ids, shap_df,
+                      X_full=X_full, y_full=y_full)
+            log_s(f"  {len(pred_df):,} total records scored (full dataset).", progress=100)
 
             pipeline_status.update({"stage":"Complete","done":True,"running":False,
                                     "best_model":best_name,"roc_auc":bm["roc_auc"],
