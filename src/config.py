@@ -13,7 +13,7 @@ UPLOAD_DIR = BASE_DIR / "uploads"
 for d in [DATA_DIR, SQL_DIR, OUTPUT_DIR, UPLOAD_DIR]:
     d.mkdir(exist_ok=True)
 
-# ── MySQL ──────────────────────────────────────────────────────git init
+# ── MySQL ──────────────────────────────────────────────────────
 DB_CONFIG = {
     "host":     os.getenv("DB_HOST",     "localhost"),
     "port":     int(os.getenv("DB_PORT", 3306)),
