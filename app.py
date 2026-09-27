@@ -43,10 +43,11 @@ def api_summary():
     try:
         pred = qry("""
             SELECT COUNT(*) AS total_scored,
-                   SUM(churn_predicted) AS predicted_churners,
-                   SUM(CASE WHEN risk_segment='High'   THEN 1 ELSE 0 END) AS high_risk,
-                   SUM(CASE WHEN risk_segment='Medium' THEN 1 ELSE 0 END) AS medium_risk,
-                   SUM(CASE WHEN risk_segment='Low'    THEN 1 ELSE 0 END) AS low_risk,
+                   SUM(churn_actual) AS predicted_churners,
+                   SUM(CASE WHEN risk_segment='Churned' THEN 1 ELSE 0 END) AS already_churned,
+                   SUM(CASE WHEN risk_segment='High'    THEN 1 ELSE 0 END) AS high_risk,
+                   SUM(CASE WHEN risk_segment='Medium'  THEN 1 ELSE 0 END) AS medium_risk,
+                   SUM(CASE WHEN risk_segment='Low'     THEN 1 ELSE 0 END) AS low_risk,
                    MAX(model_name) AS model_name,
                    ROUND(SUM(CASE WHEN churn_actual=churn_predicted THEN 1.0 ELSE 0 END)/COUNT(*),4) AS accuracy,
                    ROUND(SUM(CASE WHEN churn_actual=1 AND churn_predicted=1 THEN 1.0 ELSE 0 END)
@@ -62,51 +63,44 @@ def api_summary():
         raw_total = qry("SELECT COUNT(*) AS n FROM raw_data").iloc[0]["n"]
 
         # Try to compute actual churn rate from raw_data if target col known
-        actual_churn_rate = None
-        target_col = SCHEMA.get("target_col")
-        target_pos = SCHEMA.get("target_positive")
-        if target_col and target_pos:
-            try:
-                r = qry(f"""
-                    SELECT ROUND(SUM(CASE WHEN `{target_col}`='{target_pos}' THEN 1 ELSE 0 END)/COUNT(*)*100,1) AS cr
-                    FROM raw_data
-                """).iloc[0]
-                actual_churn_rate = float(r["cr"] or 0)
-            except Exception:
-                pass
-
+               # REPLACE the target_col block with features table query (always works)
+        try:
+            r = qry("SELECT ROUND(SUM(churn)/COUNT(*)*100,1) AS cr FROM features").iloc[0]
+            actual_churn_rate = float(r["cr"] or 0)
+        except Exception:
+            actual_churn_rate = None
         # Try avg numeric columns generically
+                # Try avg numeric columns generically
         num_stats = {}
         try:
             cols = qry("SELECT * FROM raw_data LIMIT 1").columns.tolist()
-            num_cols = [c for c in cols if c not in [SCHEMA.get("id_col"), SCHEMA.get("target_col")]]
             for col in ["Customer_Age","Credit_Limit","Total_Trans_Ct","Avg_Utilization_Ratio"]:
-                if col in num_cols:
+                if col in cols:
                     val = qry(f"SELECT ROUND(AVG(`{col}`),1) AS v FROM raw_data").iloc[0]["v"]
                     num_stats[col] = float(val or 0)
         except Exception:
             pass
 
-        # Avg age by churn class if available
+        # Avg age by churn class — read from features table (always has churn col)
         avg_age_churned = avg_age_existing = None
-        if "Customer_Age" in num_stats and target_col and target_pos:
-            try:
-                r = qry(f"""
-                    SELECT
-                        ROUND(AVG(CASE WHEN `{target_col}`='{target_pos}' THEN Customer_Age END),1) AS ac,
-                        ROUND(AVG(CASE WHEN `{target_col}`!='{target_pos}' THEN Customer_Age END),1) AS ae
-                    FROM raw_data
-                """).iloc[0]
-                avg_age_churned  = float(r["ac"] or 0)
-                avg_age_existing = float(r["ae"] or 0)
-            except Exception:
-                pass
+        try:
+            r = qry("""
+                SELECT
+                    ROUND(AVG(CASE WHEN churn=1 THEN Customer_Age END),1) AS ac,
+                    ROUND(AVG(CASE WHEN churn=0 THEN Customer_Age END),1) AS ae
+                FROM features
+            """).iloc[0]
+            avg_age_churned  = float(r["ac"]) if r["ac"] is not None else None
+            avg_age_existing = float(r["ae"]) if r["ae"] is not None else None
+        except Exception:
+            pass
 
         return jsonify({
             "total_raw":          int(raw_total or 0),
             "total_scored":       int(pred["total_scored"]       or 0),
             "churn_rate":         round(float(pred["predicted_churners"] or 0)/float(pred["total_scored"] or 1)*100, 1),
             "actual_churn_rate":  actual_churn_rate,
+            "already_churned":    int(pred["already_churned"]    or 0),
             "high_risk":          int(pred["high_risk"]          or 0),
             "medium_risk":        int(pred["medium_risk"]        or 0),
             "low_risk":           int(pred["low_risk"]           or 0),
@@ -275,7 +269,7 @@ def api_run_pipeline():
             # Stage 2 — Preprocess
             log_s("Stage 2/6 — Feature engineering + SMOTE balancing...", "Preprocessing", 20)
             preprocess = fresh("src.preprocess")
-            X_train, X_test, y_train, y_test, feature_names, X_full = preprocess.run()
+            X_train, X_test, y_train, y_test, feature_names, X_full, y_full = preprocess.run()
             log_s(f"  {len(feature_names)} features | Train: {len(X_train):,} | Test: {len(X_test):,}", progress=35)
 
             # Fetch IDs
@@ -313,13 +307,11 @@ def api_run_pipeline():
             # Stage 6 — Predict
             log_s("Stage 6/6 — Writing predictions to MySQL...", "Saving", 91)
             predict = fresh("src.predict")
-            # Load full y for all-row prediction
-            from sqlalchemy import create_engine as CE2
-            eng_full = CE2(DB_URL)
-            features_full = pd.read_sql("SELECT churn FROM features", eng_full)
-            y_full = features_full["churn"]
-            pred_df = predict.run(best_name, best_model, X_test, y_test, test_ids, shap_df,
-                      X_full=X_full, y_full=y_full)
+            pred_df = predict.run(
+                best_name, best_model,
+                X_test, y_test, test_ids, shap_df,
+                X_full=X_full, y_full=y_full
+            )
             log_s(f"  {len(pred_df):,} total records scored (full dataset).", progress=100)
 
             pipeline_status.update({"stage":"Complete","done":True,"running":False,
