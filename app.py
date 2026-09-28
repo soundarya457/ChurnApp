@@ -150,26 +150,60 @@ def api_top_features():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
 @app.route("/api/customers")
 def api_customers():
     page     = int(request.args.get("page", 1))
-    per_page = int(request.args.get("per_page", 20))
+    per_page = int(request.args.get("per_page", 50))
     segment  = request.args.get("segment", "")
-    offset   = (page-1)*per_page
+    offset   = (page - 1) * per_page
     where    = f"WHERE risk_segment='{segment}'" if segment else ""
     try:
         total = qry(f"SELECT COUNT(*) AS n FROM churn_predictions {where}").iloc[0]["n"]
-        df    = qry(f"""SELECT CLIENTNUM,churn_actual,churn_proba,churn_predicted,risk_segment
-                        FROM churn_predictions {where}
-                        ORDER BY churn_proba DESC LIMIT {per_page} OFFSET {offset}""")
-        return jsonify({"total":int(total),"page":page,"per_page":per_page,
-                        "customers":df.to_dict(orient="records")})
+        df    = qry(f"""
+            SELECT CLIENTNUM, churn_actual, churn_proba, churn_predicted, risk_segment
+            FROM churn_predictions {where}
+            ORDER BY churn_proba DESC
+            LIMIT {per_page} OFFSET {offset}
+        """)
+        return jsonify({
+            "total":     int(total),
+            "page":      page,
+            "per_page":  per_page,
+            "customers": df.to_dict(orient="records")
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/customer/<client_id>")
+@app.route("/api/customers/download")
+def api_customers_download():
+    """Download ALL predictions as CSV."""
+    segment = request.args.get("segment", "")
+    where   = f"WHERE risk_segment='{segment}'" if segment else ""
+    try:
+        df = qry(f"""
+            SELECT CLIENTNUM, churn_actual, churn_proba, churn_predicted,
+                   risk_segment, model_name, scored_at
+            FROM churn_predictions {where}
+            ORDER BY churn_proba DESC
+        """)
+        from flask import Response
+        import io
+        output = io.StringIO()
+        df.to_csv(output, index=False)
+        output.seek(0)
+        fname = f"churn_predictions{'_'+segment if segment else ''}.csv"
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={fname}"}
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+
 def api_customer_detail(client_id):
     try:
         pred = qry(f"SELECT * FROM churn_predictions WHERE CLIENTNUM='{client_id}'").to_dict(orient="records")
