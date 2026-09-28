@@ -112,7 +112,9 @@ tbody td{padding:9px 16px;color:var(--t1)}
 .bl{background:var(--greenlt);color:var(--green)}
 .bc{background:var(--redlt);color:#b91c1c}
 .bs{background:var(--bluelt);color:var(--blue)}
+.bchurned{background:#fdf4ff;color:#7c3aed;}
 body.dark .bh{color:#fca5a5}body.dark .bm{color:#fcd34d}body.dark .bl{color:#86efac}body.dark .bc{color:#fca5a5}body.dark .bs{color:#93c5fd}
+body.dark .bchurned{color:#c4b5fd;background:#2e1065}
 
 /* ── PROB BAR ── */
 .pbw{display:flex;align-items:center;gap:8px}
@@ -120,17 +122,26 @@ body.dark .bh{color:#fca5a5}body.dark .bm{color:#fcd34d}body.dark .bl{color:#86e
 .pbf{height:100%;border-radius:3px}
 .pbp{width:36px;text-align:right;font-size:12px;font-weight:600;color:var(--t1)}
 
-/* ── FILTERS ── */
-.fr{display:flex;gap:6px;margin-bottom:11px}
+/* ── FILTERS + TABLE TOOLBAR ── */
+.cust-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:8px}
+.fr{display:flex;gap:6px;flex-wrap:wrap}
 .fbtn{padding:5px 12px;border-radius:var(--rs);border:1px solid var(--bdr);background:var(--sur);color:var(--t2);font-size:12px;font-weight:500;font-family:inherit;cursor:pointer;transition:all var(--ease)}
 .fbtn:hover{border-color:var(--bluemd);color:var(--blue)}
 .fbtn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.toolbar-right{display:flex;align-items:center;gap:10px}
+.rec-count{font-size:12px;color:var(--t3);white-space:nowrap}
+.dl-btn{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--rs);border:1px solid var(--blue);background:var(--bluelt);color:var(--blue);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;transition:all var(--ease);white-space:nowrap}
+.dl-btn:hover{background:var(--blue);color:#fff}
+.dl-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 /* ── PAGINATION ── */
-.pgr{display:flex;align-items:center;justify-content:flex-end;gap:3px;padding:10px 16px;border-top:1px solid var(--bdr)}
-.pgb{width:28px;height:28px;border-radius:var(--rs);border:1px solid var(--bdr);background:var(--sur);color:var(--t2);font-size:12px;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all var(--ease)}
+.pgr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--bdr);flex-wrap:wrap;gap:6px}
+.pgr-info{font-size:11px;color:var(--t3)}
+.pgr-btns{display:flex;align-items:center;gap:3px}
+.pgb{min-width:28px;height:28px;padding:0 6px;border-radius:var(--rs);border:1px solid var(--bdr);background:var(--sur);color:var(--t2);font-size:12px;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all var(--ease)}
 .pgb:hover{border-color:var(--bluemd);color:var(--blue)}
 .pgb.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.pgb:disabled{opacity:.4;cursor:not-allowed}
 
 /* ── PLOT ── */
 .pli img{width:100%;display:block;border-radius:4px}
@@ -299,7 +310,7 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
       </div>
       <div class="g2">
         <div class="card">
-          <div class="ch"><div class="ct">Model Performance</div><div class="csu">Test set evaluation</div></div>
+          <div class="ch"><div class="ct">Model Performance</div><div class="csu">Test set evaluation metrics</div></div>
           <div class="cb" style="padding-bottom:0"><div style="position:relative;height:175px"><canvas id="cmodel"></canvas></div></div>
           <div class="minirow">
             <div class="mini"><div class="mv" id="ms-pr" style="color:var(--blue)">—</div><div class="ml">Precision</div></div>
@@ -326,11 +337,22 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
 
     <!-- CUSTOMERS -->
     <div class="pg" id="page-customers">
-      <div class="fr">
-        <button class="fbtn active" data-seg="">All</button>
-        <button class="fbtn" data-seg="High">High Risk</button>
-        <button class="fbtn" data-seg="Medium">Medium Risk</button>
-        <button class="fbtn" data-seg="Low">Low Risk</button>
+      <!-- Toolbar: filters + record count + download -->
+      <div class="cust-toolbar">
+        <div class="fr">
+          <button class="fbtn active" data-seg="">All</button>
+          <button class="fbtn" data-seg="Churned">Already Churned</button>
+          <button class="fbtn" data-seg="High">High Risk</button>
+          <button class="fbtn" data-seg="Medium">Medium Risk</button>
+          <button class="fbtn" data-seg="Low">Low Risk</button>
+        </div>
+        <div class="toolbar-right">
+          <span class="rec-count" id="rec-count"></span>
+          <button class="dl-btn" onclick="downloadCSV()">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Download CSV
+          </button>
+        </div>
       </div>
       <div class="card">
         <div class="tw">
@@ -369,8 +391,6 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
     <!-- UPLOAD -->
     <div class="pg" id="page-upload">
       <div class="upg">
-
-        <!-- Left: drop + schema result -->
         <div style="display:flex;flex-direction:column;gap:14px">
           <div class="card">
             <div class="ch"><div class="ct">Upload Dataset</div><div class="csu">Any CSV file with a binary target column</div></div>
@@ -387,52 +407,26 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
               <button class="upbtn" id="upbtn" disabled>Upload Dataset</button>
             </div>
           </div>
-
-          <!-- Schema card (shown after upload) -->
           <div class="card" id="schema-card" style="display:none">
             <div class="ch"><div class="ct">Auto-Detected Schema</div><div class="csu">Columns identified automatically from your file</div></div>
             <div class="cb" id="schema-body"></div>
           </div>
         </div>
-
-        <!-- Right: steps -->
         <div class="card">
           <div class="ch"><div class="ct">How It Works</div><div class="csu">Upload any CSV and the app handles everything</div></div>
           <div class="cb">
             <div class="steps">
-              <div class="step">
-                <div class="stpn">1</div>
-                <div>
-                  <div class="stpt">Upload any CSV dataset</div>
-                  <div class="stpd">Drop any CSV file — no configuration needed. The app automatically detects your ID column, binary target column, categorical features, and numerical features. Works with any domain.</div>
-                </div>
-              </div>
-              <div class="step">
-                <div class="stpn">2</div>
-                <div>
-                  <div class="stpt">Run the ML pipeline</div>
-                  <div class="stpd">Click Run Pipeline to trigger all 6 automated stages: load into MySQL, feature engineering, SMOTE class balancing, train 4 models (Logistic Regression, Random Forest, XGBoost, MLP), evaluate all models, generate SHAP explanations.</div>
-                </div>
-              </div>
-              <div class="step">
-                <div class="stpn">3</div>
-                <div>
-                  <div class="stpt">Explore predictions</div>
-                  <div class="stpd">Navigate to Overview for KPIs, Customer Risk Table for all predictions, Model Evaluation for ROC and confusion matrix charts, and SHAP Explainability to understand what drives each prediction.</div>
-                </div>
-              </div>
+              <div class="step"><div class="stpn">1</div><div><div class="stpt">Upload any CSV dataset</div><div class="stpd">Drop any CSV file — no configuration needed. The app automatically detects your ID column, binary target column, categorical features, and numerical features. Works with any domain.</div></div></div>
+              <div class="step"><div class="stpn">2</div><div><div class="stpt">Run the ML pipeline</div><div class="stpd">Click Run Pipeline to trigger all 6 automated stages: load into MySQL, feature engineering, SMOTE class balancing, train models, evaluate, generate SHAP explanations.</div></div></div>
+              <div class="step"><div class="stpn">3</div><div><div class="stpt">Explore predictions</div><div class="stpd">Navigate to Overview for KPIs, Customer Risk Table for all predictions with download option, Model Evaluation for ROC curves, and SHAP Explainability.</div></div></div>
             </div>
           </div>
         </div>
       </div>
-
-      <!-- Dataset summary (shown after upload) -->
       <div class="card" id="preview-card" style="display:none;margin-bottom:14px">
         <div class="ch"><div class="ct">Dataset Summary</div><div class="csu" id="preview-fname"></div></div>
         <div class="cb"><div class="prvst" id="prvst"></div></div>
       </div>
-
-      <!-- Pipeline card -->
       <div class="card">
         <div class="ch"><div class="ct">ML Pipeline</div><div class="csu">Train and score on your uploaded dataset</div></div>
         <div class="cb">
@@ -447,8 +441,8 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
       </div>
     </div>
 
-  </div><!-- pgwrap -->
-</div><!-- mw -->
+  </div>
+</div>
 
 <!-- MODAL -->
 <div class="mbg" id="modal">
@@ -517,7 +511,6 @@ function anim(id,target,pre="",suf=""){
 async function loadDashboard(){
   const s=await get("/api/summary").catch(()=>({}));
   if(!s.total_raw)return;
-
   anim("k-total",s.total_raw);
   $("k-achurn").textContent=s.actual_churn_rate!=null?s.actual_churn_rate+"%":"N/A";
   $("k-pchurn").textContent=s.churn_rate+"%";
@@ -534,61 +527,43 @@ async function loadDashboard(){
 
   const t=tc(),g=gc();
 
-  new Chart($("cmodel"),{
-    type:"bar",
-    data:{labels:["Accuracy","Precision","Recall"],datasets:[{
-      data:[+((s.accuracy||0)*100).toFixed(1),+((s.precision||0)*100).toFixed(1),+((s.recall||0)*100).toFixed(1)],
-      backgroundColor:["rgba(245,158,11,.8)","rgba(37,99,235,.8)","rgba(22,163,74,.8)"],borderRadius:5
-    }]},
-    options:{animation:{duration:900,easing:"easeOutQuart"},plugins:{legend:{display:false}},
-      scales:{x:{ticks:{color:t},grid:{display:false}},y:{min:0,max:100,ticks:{color:t,callback:v=>v+"%"},grid:{color:g}}}}
-  });
+  new Chart($("cmodel"),{type:"bar",data:{labels:["Accuracy","Precision","Recall"],datasets:[{data:[+((s.accuracy||0)*100).toFixed(1),+((s.precision||0)*100).toFixed(1),+((s.recall||0)*100).toFixed(1)],backgroundColor:["rgba(245,158,11,.8)","rgba(37,99,235,.8)","rgba(22,163,74,.8)"],borderRadius:5}]},options:{animation:{duration:900,easing:"easeOutQuart"},plugins:{legend:{display:false}},scales:{x:{ticks:{color:t},grid:{display:false}},y:{min:0,max:100,ticks:{color:t,callback:v=>v+"%"},grid:{color:g}}}}});
 
   const rd=await get("/api/risk_distribution").catch(()=>[]);
-  new Chart($("crisk"),{
-    type:"doughnut",
-    data:{labels:rd.map(r=>r.risk_segment),datasets:[{
-      data:rd.map(r=>r.count),
-      backgroundColor:["#ef4444","#f59e0b","#16a34a"],
-      borderWidth:3,borderColor:document.body.classList.contains("dark")?"#131929":"#fff"
-    }]},
-    options:{animation:{animateRotate:true,duration:1000,easing:"easeOutQuart"},
-      plugins:{legend:{position:"right",labels:{color:t,padding:14,font:{size:12,weight:"500"}}}},cutout:"65%"}
-  });
+  const rColors=rd.map(r=>r.risk_segment==='Churned'?'#7c3aed':r.risk_segment==='High'?'#ef4444':r.risk_segment==='Medium'?'#f59e0b':'#16a34a');
+  new Chart($("crisk"),{type:"doughnut",data:{labels:rd.map(r=>r.risk_segment),datasets:[{data:rd.map(r=>r.count),backgroundColor:rColors,borderWidth:3,borderColor:document.body.classList.contains("dark")?"#131929":"#fff"}]},options:{animation:{animateRotate:true,duration:1000,easing:"easeOutQuart"},plugins:{legend:{position:"right",labels:{color:t,padding:14,font:{size:12,weight:"500"}}}},cutout:"65%"}});
 
   const pd=await get("/api/churn_by_proba").catch(()=>({labels:[],churn:[],no_churn:[]}));
-  new Chart($("cproba"),{
-    type:"bar",
-    data:{labels:pd.labels,datasets:[
-      {label:"Churned",data:pd.churn,backgroundColor:"rgba(239,68,68,.72)",borderRadius:3},
-      {label:"Existing",data:pd.no_churn,backgroundColor:"rgba(37,99,235,.5)",borderRadius:3}
-    ]},
-    options:{animation:{duration:900,easing:"easeOutQuart"},
-      plugins:{legend:{labels:{color:t,padding:12,font:{size:11}}}},
-      scales:{x:{ticks:{color:t,maxRotation:45,font:{size:9}},grid:{display:false}},y:{ticks:{color:t},grid:{color:g}}}}
-  });
+  new Chart($("cproba"),{type:"bar",data:{labels:pd.labels,datasets:[{label:"Churned",data:pd.churn,backgroundColor:"rgba(239,68,68,.72)",borderRadius:3},{label:"Existing",data:pd.no_churn,backgroundColor:"rgba(37,99,235,.5)",borderRadius:3}]},options:{animation:{duration:900,easing:"easeOutQuart"},plugins:{legend:{labels:{color:t,padding:12,font:{size:11}}}},scales:{x:{ticks:{color:t,maxRotation:45,font:{size:9}},grid:{display:false}},y:{ticks:{color:t},grid:{color:g}}}}});
 
   const sd=await get("/api/top_features").catch(()=>[]);
-  new Chart($("cshap"),{
-    type:"bar",
-    data:{labels:sd.map(d=>d.feature_name),datasets:[{
-      label:"Mean |SHAP|",data:sd.map(d=>d.mean_abs_shap),
-      backgroundColor:sd.map((_,i)=>`rgba(37,99,235,${1-i*0.07})`),borderRadius:4
-    }]},
-    options:{indexAxis:"y",animation:{duration:1100,easing:"easeOutQuart"},plugins:{legend:{display:false}},
-      scales:{x:{ticks:{color:t,font:{size:10}},grid:{color:g}},
-              y:{ticks:{color:document.body.classList.contains("dark")?"#e8edf5":"#334155",font:{size:10.5}},grid:{display:false}}}}
-  });
+  new Chart($("cshap"),{type:"bar",data:{labels:sd.map(d=>d.feature_name),datasets:[{label:"Mean |SHAP|",data:sd.map(d=>d.mean_abs_shap),backgroundColor:sd.map((_,i)=>`rgba(37,99,235,${1-i*0.07})`),borderRadius:4}]},options:{indexAxis:"y",animation:{duration:1100,easing:"easeOutQuart"},plugins:{legend:{display:false}},scales:{x:{ticks:{color:t,font:{size:10}},grid:{color:g}},y:{ticks:{color:document.body.classList.contains("dark")?"#e8edf5":"#334155",font:{size:10.5}},grid:{display:false}}}}});
 }
 loadDashboard();
 
-// Customers
-let custOk=false,curPg=1,curSeg="";
+// ── Customer Risk Table ────────────────────────────────────────
+let custOk=false,curPg=1,curSeg="",curTotal=0;
+const PER_PAGE=50;
+
+function segBadgeClass(seg){
+  if(seg==='Churned') return 'bchurned';
+  if(seg==='High')    return 'bh';
+  if(seg==='Medium')  return 'bm';
+  return 'bl';
+}
+
 async function loadCust(pg=1,seg=""){
   custOk=true;curPg=pg;curSeg=seg;
   const tb=$("ctbody");
   tb.innerHTML='<tr><td colspan="5" class="ldc"><div class="spin"></div></td></tr>';
-  const d=await get(`/api/customers?page=${pg}&per_page=20&segment=${seg}`).catch(()=>({customers:[],total:0}));
+
+  const d=await get(`/api/customers?page=${pg}&per_page=${PER_PAGE}&segment=${seg}`).catch(()=>({customers:[],total:0}));
+  curTotal=d.total||0;
+
+  // Update record count
+  const rc=$("rec-count");
+  if(rc) rc.textContent=`${curTotal.toLocaleString()} record${curTotal!==1?'s':''}${seg?' · '+seg:''}`;
+
   tb.innerHTML=d.customers.map(c=>{
     const pr=(c.churn_proba*100).toFixed(1);
     const cl=c.churn_proba>.7?"#ef4444":c.churn_proba>.4?"#f59e0b":"#16a34a";
@@ -597,26 +572,71 @@ async function loadCust(pg=1,seg=""){
       <td><span class="badge ${c.churn_actual?'bc':'bs'}">${c.churn_actual?'Churned':'Existing'}</span></td>
       <td><span class="badge ${c.churn_predicted?'bc':'bs'}">${c.churn_predicted?'Churn':'Stay'}</span></td>
       <td><div class="pbw"><div class="pbt"><div class="pbf" style="width:${pr}%;background:${cl}"></div></div><div class="pbp">${pr}%</div></div></td>
-      <td><span class="badge b${c.risk_segment[0].toLowerCase()}">${c.risk_segment}</span></td>
+      <td><span class="badge ${segBadgeClass(c.risk_segment)}">${c.risk_segment}</span></td>
     </tr>`;
   }).join("")||'<tr><td colspan="5" style="text-align:center;padding:28px;color:var(--t3)">No records found</td></tr>';
-  const pages=Math.ceil(d.total/20),pa=$("cpag");pa.innerHTML="";
-  Array.from({length:Math.min(pages,8)},(_,i)=>i+1).forEach(p=>{
-    const b=document.createElement("button");
-    b.className="pgb"+(p===pg?" active":"");b.textContent=p;
-    b.onclick=()=>loadCust(p,curSeg);pa.appendChild(b);
-  });
+
+  // Pagination
+  const pages=Math.ceil(curTotal/PER_PAGE);
+  const pa=$("cpag");
+  pa.innerHTML="";
+
+  if(pages<=1) return;
+
+  const info=document.createElement("span");
+  info.className="pgr-info";
+  info.textContent=`Page ${pg} of ${pages} · ${curTotal.toLocaleString()} records`;
+
+  const btns=document.createElement("div");
+  btns.className="pgr-btns";
+
+  // Prev
+  const prev=document.createElement("button");
+  prev.className="pgb";prev.textContent="←";prev.disabled=pg<=1;
+  prev.onclick=()=>loadCust(pg-1,curSeg);
+  btns.appendChild(prev);
+
+  // Page numbers — smart window
+  let start=Math.max(1,pg-3),end=Math.min(pages,pg+3);
+  if(start>1){const b=document.createElement("button");b.className="pgb";b.textContent="1";b.onclick=()=>loadCust(1,curSeg);btns.appendChild(b);if(start>2){const dots=document.createElement("span");dots.textContent="…";dots.style.cssText="padding:0 4px;color:var(--t3);font-size:12px";btns.appendChild(dots)}}
+  for(let p=start;p<=end;p++){const b=document.createElement("button");b.className="pgb"+(p===pg?" active":"");b.textContent=p;b.onclick=()=>loadCust(p,curSeg);btns.appendChild(b)}
+  if(end<pages){if(end<pages-1){const dots=document.createElement("span");dots.textContent="…";dots.style.cssText="padding:0 4px;color:var(--t3);font-size:12px";btns.appendChild(dots)}const b=document.createElement("button");b.className="pgb";b.textContent=pages;b.onclick=()=>loadCust(pages,curSeg);btns.appendChild(b)}
+
+  // Next
+  const next=document.createElement("button");
+  next.className="pgb";next.textContent="→";next.disabled=pg>=pages;
+  next.onclick=()=>loadCust(pg+1,curSeg);
+  btns.appendChild(next);
+
+  pa.appendChild(info);
+  pa.appendChild(btns);
 }
+
+// Filter buttons
 document.querySelectorAll(".fbtn").forEach(b=>{
   b.addEventListener("click",()=>{
     document.querySelectorAll(".fbtn").forEach(x=>x.classList.remove("active"));
-    b.classList.add("active");loadCust(1,b.dataset.seg);
+    b.classList.add("active");
+    loadCust(1,b.dataset.seg);
   });
 });
 
+// Download CSV
+function downloadCSV(){
+  const seg=curSeg;
+  const url=`/api/customers/download${seg?'?segment='+encodeURIComponent(seg):''}`;
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=seg?`churn_${seg.toLowerCase()}_predictions.csv`:'churn_all_predictions.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 // Modal
 async function showRec(id){
-  $("modal").classList.add("open");$("mtit").textContent=`Record ${id}`;
+  $("modal").classList.add("open");
+  $("mtit").textContent=`Record ${id}`;
   $("mdtl").innerHTML='<div style="grid-column:span 2;text-align:center;padding:20px"><div class="spin"></div></div>';
   $("mshap").innerHTML="";
   const data=await get(`/api/customer/${id}`).catch(()=>({}));
@@ -668,18 +688,10 @@ const dropz=$("dropz"),fi=$("finput"),upbtn=$("upbtn");
 dropz.addEventListener("click",()=>fi.click());
 dropz.addEventListener("dragover",e=>{e.preventDefault();dropz.classList.add("drag")});
 dropz.addEventListener("dragleave",()=>dropz.classList.remove("drag"));
-dropz.addEventListener("drop",e=>{
-  e.preventDefault();dropz.classList.remove("drag");
-  if(e.dataTransfer.files[0])setFile(e.dataTransfer.files[0]);
-});
+dropz.addEventListener("drop",e=>{e.preventDefault();dropz.classList.remove("drag");if(e.dataTransfer.files[0])setFile(e.dataTransfer.files[0])});
 fi.addEventListener("change",()=>{if(fi.files[0])setFile(fi.files[0])});
 
-function setFile(f){
-  selFile=f;
-  $("dzfile").textContent=f.name+" ("+fmtB(f.size)+")";
-  upbtn.disabled=false;
-  hideAlerts();
-}
+function setFile(f){selFile=f;$("dzfile").textContent=f.name+" ("+fmtB(f.size)+")";upbtn.disabled=false;hideAlerts()}
 function fmtB(b){if(b<1024)return b+"B";if(b<1048576)return(b/1024).toFixed(1)+"KB";return(b/1048576).toFixed(1)+"MB"}
 function hideAlerts(){$("aok").classList.remove("show");$("aerr").classList.remove("show")}
 
@@ -692,12 +704,9 @@ upbtn.addEventListener("click",async()=>{
     const d=await r.json();
     upbtn.textContent="Upload Dataset";
     if(d.error){$("aerr").textContent=d.error;$("aerr").classList.add("show");upbtn.disabled=false;return}
-
     $("aok").textContent=`Uploaded successfully — ${d.rows.toLocaleString()} rows, ${d.columns} columns detected.`;
     $("aok").classList.add("show");
     upbtn.disabled=false;
-
-    // Show auto-detected schema
     $("schema-card").style.display="block";
     $("schema-body").innerHTML=`
       <div style="margin-bottom:10px">
@@ -708,8 +717,6 @@ upbtn.addEventListener("click",async()=>{
       <div style="margin-bottom:10px">${(d.cat_cols||[]).map(c=>`<span class="sctag sc-cat">${c}</span>`).join("")||'<span style="color:var(--t3);font-size:12px">None detected</span>'}</div>
       <div style="margin-bottom:6px;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.7px">Numerical Features (${(d.num_cols||[]).length})</div>
       <div>${(d.num_cols||[]).map(c=>`<span class="sctag sc-num">${c}</span>`).join("")||'<span style="color:var(--t3);font-size:12px">None detected</span>'}</div>`;
-
-    // Dataset summary stats
     $("preview-card").style.display="block";
     $("preview-fname").textContent=d.filename;
     $("prvst").innerHTML=`
@@ -732,10 +739,7 @@ $("runbtn").addEventListener("click",async()=>{
   $("pipeprg").style.display="block";$("resgrid").style.display="none";
   $("logbox").innerHTML="";$("prgbar").style.width="0%";$("stgtxt").textContent="Initialising...";
   const r=await fetch("/api/run_pipeline",{method:"POST"}).then(x=>x.json()).catch(e=>({error:e.message}));
-  if(r.error){
-    $("stgtxt").textContent="Error: "+r.error;
-    $("runbtn").disabled=false;$("runbtn").textContent="Run Full Pipeline";return;
-  }
+  if(r.error){$("stgtxt").textContent="Error: "+r.error;$("runbtn").disabled=false;$("runbtn").textContent="Run Full Pipeline";return}
   polling=setInterval(pollStatus,1500);
 });
 
@@ -748,7 +752,6 @@ async function pollStatus(){
     return `<div class="${cls}">${l}</div>`;
   }).join("");
   $("logbox").scrollTop=$("logbox").scrollHeight;
-
   if(!s.running){
     clearInterval(polling);
     $("runbtn").disabled=false;$("runbtn").textContent="Run Full Pipeline";
