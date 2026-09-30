@@ -105,6 +105,8 @@ def run():
     id_col = SCHEMA["id_col"]
     drop   = ["churn"] + ([id_col] if id_col and id_col in df.columns else [])
     if "_row_id" in df.columns: drop.append("_row_id")
+    # _source_row is only a join/ordering key for the DB — never a model feature
+    if "_source_row" in df.columns: drop.append("_source_row")
 
     X_full = df.drop(columns=[c for c in drop if c in df.columns])
     y_full = df["churn"]
