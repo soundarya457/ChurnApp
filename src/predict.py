@@ -70,34 +70,6 @@ def batch_predict_all(best_name, best_model, X_full, y_full):
     log.info(f"  Total predicted: {len(df):,} | Segments: {df['risk_segment'].value_counts().to_dict()}")
     return df
 
-    # Get IDs
-    engine = create_engine(DB_URL, echo=False)
-    id_col = SCHEMA.get("id_col")
-    try:
-        id_df      = pd.read_sql(f"SELECT `{id_col}` FROM features", con=engine)
-        client_ids = id_df[id_col].astype(str).tolist()
-    except Exception:
-        client_ids = [str(i) for i in range(1, len(X_full)+1)]
-
-    y_vals    = y_full.values.tolist() if hasattr(y_full, "values") else list(y_full)
-    min_len   = min(len(client_ids), len(all_probas), len(y_vals))
-    client_ids = client_ids[:min_len]
-    all_probas = all_probas[:min_len]
-    all_preds  = all_preds[:min_len]
-    y_vals     = y_vals[:min_len]
-
-    df = pd.DataFrame({
-        ID_COL:            client_ids,
-        "churn_actual":    [int(v) for v in y_vals],
-        "churn_proba":     [round(float(p), 4) for p in all_probas],
-        "churn_predicted": [int(p) for p in all_preds],
-        "risk_segment":    [assign_risk(p, v) for p, v in zip(all_probas, y_vals)],
-        "model_name":      best_name,
-    })
-
-    log.info(f"  Segments: {df['risk_segment'].value_counts().to_dict()}")
-    return df
-
 
 def write_predictions(df):
     engine = create_engine(DB_URL, echo=False)
