@@ -31,70 +31,99 @@ def detect_id_col(df: pd.DataFrame) -> str | None:
     return None
 
 
+def _positive_label(values, counts):
+    """Infer the positive/churn label from common binary encodings."""
+    vals = [str(v).strip() for v in values]
+    lower = {v.lower(): v for v in vals}
+    positive_words = (
+        "churn", "churned", "attrited", "attrition", "yes", "true", "1",
+        "exited", "left", "cancelled", "canceled", "default", "fraud",
+        "converted", "inactive"
+    )
+    negative_words = (
+        "no", "false", "0", "existing", "stay", "stayed", "active",
+        "retained", "not churned", "not_churned", "no churn", "no_churn"
+    )
+    for v in vals:
+        lv = v.lower()
+        if any(lv == word or lv.startswith(word + " ") or word in lv
+               for word in positive_words):
+            return v
+    # If exactly one value looks negative, use the other value as positive.
+    neg = [v for v in vals if any(v.lower() == word or word in v.lower()
+                                  for word in negative_words)]
+    if len(neg) == 1 and len(vals) == 2:
+        return next(v for v in vals if v != neg[0])
+    # Numeric binary targets conventionally use 1 as positive.
+    normalized_numeric = {v[:-2] if v.endswith(".0") else v for v in vals}
+    if normalized_numeric.issubset({"0", "1"}):
+        for v in vals:
+            if v in ("1", "1.0"):
+                return v
+    # Last resort: minority class, but only after a strong target-name match.
+    return str(counts.sort_values().index[0])
+
+
 def detect_target_col(df: pd.DataFrame, id_col: str | None) -> tuple:
     """
-    Return (target_col, positive_label).
-    Priority:
-      1. Columns with churn-related names
-      2. Binary integer columns (0/1) — minority class = positive
-      3. Binary string columns — minority class = positive
-    Explicitly skips demographic columns (Gender, Geography etc.)
+    Detect the actual binary target. Strong target names are preferred over
+    generic binary columns such as SeniorCitizen, Gender encodings, flags, etc.
     """
     skip = {id_col} if id_col else set()
 
-    # Columns that are almost certainly NOT the target
+    # Explicitly exclude common non-target demographic / feature flags.
     demographic_pattern = re.compile(
         r"^(gender|sex|geography|country|region|state|city|name|surname|"
-        r"firstname|lastname|email|phone|address|zip|postal)$",
-        re.I
+        r"firstname|lastname|email|phone|address|zip|postal|senior.?citizen|"
+        r"dependents?|partner|married|tenure|age)$", re.I
     )
 
-    # Priority 1: column name strongly suggests churn/target
-    churn_pattern = re.compile(
-        r"(churn|attrition|exited|left|cancelled|canceled|churned|"
-        r"target|label|class|outcome|default|fraud|converted)",
-        re.I
-    )
+    # Strong names score highest; generic "class/label" is deliberately weaker.
+    patterns = [
+        (100, re.compile(r"(churn|churned|attrition|attrited|exited|cancelled|canceled|"
+                         r"customer.?status|subscription.?status)", re.I)),
+        (90, re.compile(r"(^|_)(left|default|fraud|converted)(_|$)", re.I)),
+        (70, re.compile(r"(target|outcome|response|label)", re.I)),
+        (40, re.compile(r"(^|_)(class)(_|$)", re.I)),
+    ]
 
-    # Check named churn columns first
+    candidates = []
     for col in df.columns:
-        if col in skip or demographic_pattern.match(col):
-            continue
-        if churn_pattern.search(col):
-            vals = df[col].dropna().unique()
-            if len(vals) == 2:
-                # For string binary: minority = positive
-                counts = df[col].value_counts()
-                positive = counts.index[-1]
-                log.info(f"  Detected target (name match): '{col}' | positive='{positive}'")
-                return col, str(positive)
-            # Handle 0/1 numeric
-            if set(map(int, vals)).issubset({0, 1}):
-                log.info(f"  Detected binary target (name match): '{col}' | positive='1'")
-                return col, "1"
-
-    # Priority 2: binary integer 0/1 columns (skip demographics)
-    for col in df.select_dtypes(include="number").columns:
-        if col in skip or demographic_pattern.match(col):
-            continue
-        vals = set(df[col].dropna().unique())
-        if vals.issubset({0, 1, 0.0, 1.0}):
-            log.info(f"  Detected binary int target: '{col}' | positive='1'")
-            return col, "1"
-
-    # Priority 3: binary string columns (skip demographics)
-    for col in df.select_dtypes(include=["object", "category"]).columns:
-        if col in skip or demographic_pattern.match(col):
+        if col in skip or demographic_pattern.match(str(col)):
             continue
         vals = df[col].dropna().unique()
-        if len(vals) == 2:
-            counts  = df[col].value_counts()
-            positive = counts.index[-1]
-            log.info(f"  Detected binary string target: '{col}' | positive='{positive}'")
-            return col, str(positive)
+        if len(vals) != 2:
+            continue
+        counts = df[col].value_counts(dropna=True)
+        if len(counts) != 2:
+            continue
 
-    return None, None
+        name_score = 0
+        for score, pattern in patterns:
+            if pattern.search(str(col)):
+                name_score = max(name_score, score)
 
+        # Binary numeric/string feature columns are only fallback candidates.
+        is_binary = set(str(v).strip().lower() for v in vals).issubset(
+            {"0", "1", "0.0", "1.0", "yes", "no", "true", "false"}
+        )
+        if name_score > 0:
+            candidates.append((name_score + 10, col, counts))
+        elif is_binary:
+            candidates.append((1, col, counts))
+
+    if not candidates:
+        return None, None
+
+    candidates.sort(key=lambda x: (-x[0], str(x[1])))
+    score, col, counts = candidates[0]
+    positive = _positive_label(df[col].dropna().unique(), counts)
+
+    log.info(
+        f"  Detected target: '{col}' | positive='{positive}' | "
+        f"candidate_score={score} | distribution={counts.to_dict()}"
+    )
+    return col, str(positive)
 
 def detect_col_types(df: pd.DataFrame, id_col: str | None, target_col: str | None):
     skip     = {c for c in [id_col, target_col] if c}
@@ -215,10 +244,9 @@ def validate(df: pd.DataFrame):
 
 
 def to_mysql(df: pd.DataFrame, engine):
-    cols_to_drop = [c for c in SCHEMA["drop_cols"] if c in df.columns]
-    if cols_to_drop:
-        df = df.drop(columns=cols_to_drop)
-
+    # Keep ALL original columns in raw_data. Columns unsuitable for ML are
+    # excluded later by preprocess.py, but must remain available for the
+    # customer-detail modal and complete CSV export.
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM raw_data"))
 
