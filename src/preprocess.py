@@ -11,7 +11,7 @@ from src.config import DB_URL, SCHEMA, TEST_SIZE, RANDOM_STATE
 import logging
 
 log = logging.getLogger(__name__)
-TRAIN_SAMPLE = 3000
+TRAIN_SAMPLE = 15000
 
 
 def load_raw():
@@ -97,6 +97,9 @@ def save_features(df):
 def run():
     df = load_raw()
     df = engineer_features(df)
+    # Stable row key lets predictions, SHAP explanations and raw records be
+    # joined in exactly the same order as the uploaded CSV.
+    df["_source_row"] = np.arange(len(df), dtype=np.int64)
     save_features(df)
 
     id_col = SCHEMA["id_col"]
