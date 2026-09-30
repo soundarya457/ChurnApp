@@ -38,7 +38,13 @@ def batch_predict_all(best_name, best_model, X_full, y_full):
     id_col = SCHEMA.get("id_col")
     try:
         # Read ALL IDs ordered by table row — must match X_full order
-        id_df      = pd.read_sql(f"SELECT `{id_col}` FROM features LIMIT {len(X_full)}", con=engine)
+        order_col = "_source_row" if "_source_row" in pd.read_sql(
+            "SELECT * FROM features LIMIT 0", con=engine).columns else None
+        order_sql = f" ORDER BY `{order_col}`" if order_col else ""
+        id_df = pd.read_sql(
+            f"SELECT `{id_col}` FROM features{order_sql} LIMIT {len(X_full)}",
+            con=engine
+        )
         client_ids = id_df[id_col].astype(str).tolist()
     except Exception:
         client_ids = [str(i) for i in range(1, len(X_full)+1)]
