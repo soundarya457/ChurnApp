@@ -130,9 +130,6 @@ body.dark .bchurned{color:#c4b5fd;background:#2e1065}
 .fbtn.active{background:var(--blue);border-color:var(--blue);color:#fff}
 .toolbar-right{display:flex;align-items:center;gap:10px}
 .rec-count{font-size:12px;color:var(--t3);white-space:nowrap}
-.dl-btn{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--rs);border:1px solid var(--blue);background:var(--bluelt);color:var(--blue);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;transition:all var(--ease);white-space:nowrap}
-.dl-btn:hover{background:var(--blue);color:#fff}
-.dl-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 /* ── PAGINATION ── */
 .pgr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--bdr);flex-wrap:wrap;gap:6px}
@@ -166,6 +163,10 @@ body.dark .bchurned{color:#c4b5fd;background:#2e1065}
 .shfg{height:100%;border-radius:3px}
 .shv{width:58px;text-align:right;font-size:11px;font-weight:600}
 .mdiv{height:1px;background:var(--bdr);margin:4px 0 14px}
+.rgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-bottom:18px}
+.rrow{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12px;min-width:0}
+.rk{color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rv{color:var(--t1);font-weight:600;text-align:right;word-break:break-word}
 
 /* ── UPLOAD PAGE ── */
 .upg{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px}
@@ -337,7 +338,7 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
 
     <!-- CUSTOMERS -->
     <div class="pg" id="page-customers">
-      <!-- Toolbar: filters + record count + download -->
+      <!-- Toolbar: filters + record count -->
       <div class="cust-toolbar">
         <div class="fr">
           <button class="fbtn active" data-seg="">All</button>
@@ -348,10 +349,6 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
         </div>
         <div class="toolbar-right">
           <span class="rec-count" id="rec-count"></span>
-          <button class="dl-btn" onclick="downloadCSV()">
-            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Download CSV
-          </button>
         </div>
       </div>
       <div class="card">
@@ -418,7 +415,7 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
             <div class="steps">
               <div class="step"><div class="stpn">1</div><div><div class="stpt">Upload any CSV dataset</div><div class="stpd">Drop any CSV file — no configuration needed. The app automatically detects your ID column, binary target column, categorical features, and numerical features. Works with any domain.</div></div></div>
               <div class="step"><div class="stpn">2</div><div><div class="stpt">Run the ML pipeline</div><div class="stpd">Click Run Pipeline to trigger all 6 automated stages: load into MySQL, feature engineering, SMOTE class balancing, train models, evaluate, generate SHAP explanations.</div></div></div>
-              <div class="step"><div class="stpn">3</div><div><div class="stpt">Explore predictions</div><div class="stpd">Navigate to Overview for KPIs, Customer Risk Table for all predictions with download option, Model Evaluation for ROC curves, and SHAP Explainability.</div></div></div>
+              <div class="step"><div class="stpn">3</div><div><div class="stpt">Explore predictions</div><div class="stpd">Navigate to Overview for KPIs, Customer Risk Table for all predictions, Model Evaluation for ROC curves, and SHAP Explainability.</div></div></div>
             </div>
           </div>
         </div>
@@ -449,6 +446,9 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
   <div class="modal">
     <div class="mhdr"><div class="mtit" id="mtit">Record Detail</div><button class="mcl" id="mcl">&#x2715;</button></div>
     <div class="dgrid" id="mdtl"></div>
+    <div class="mdiv"></div>
+    <div class="shtit">Customer Record</div>
+    <div class="rgrid" id="mrec"></div>
     <div class="mdiv"></div>
     <div class="shtit">Top SHAP Features</div>
     <div id="mshap"></div>
@@ -528,14 +528,16 @@ async function loadDashboard(){
   const t=tc(),g=gc();
 
   new Chart($("cmodel"),{type:"bar",data:{labels:["Accuracy","Precision","Recall"],datasets:[{data:[+((s.accuracy||0)*100).toFixed(1),+((s.precision||0)*100).toFixed(1),+((s.recall||0)*100).toFixed(1)],backgroundColor:["rgba(245,158,11,.8)","rgba(37,99,235,.8)","rgba(22,163,74,.8)"],borderRadius:5}]},options:{animation:{duration:900,easing:"easeOutQuart"},plugins:{legend:{display:false}},scales:{x:{ticks:{color:t},grid:{display:false}},y:{min:0,max:100,ticks:{color:t,callback:v=>v+"%"},grid:{color:g}}}}});
-
   const rd=await get("/api/risk_distribution").catch(()=>[]);
-  const rColors=rd.map(r=>r.risk_segment==='Churned'?'#7c3aed':r.risk_segment==='High'?'#ef4444':r.risk_segment==='Medium'?'#f59e0b':'#16a34a');
-  new Chart($("crisk"),{type:"doughnut",data:{labels:rd.map(r=>r.risk_segment),datasets:[{data:rd.map(r=>r.count),backgroundColor:rColors,borderWidth:3,borderColor:document.body.classList.contains("dark")?"#131929":"#fff"}]},options:{animation:{animateRotate:true,duration:1000,easing:"easeOutQuart"},plugins:{legend:{position:"right",labels:{color:t,padding:14,font:{size:12,weight:"500"}}}},cutout:"65%"}});
+  const SEG_COLORS={Churned:'#7c3aed',High:'#ef4444',Medium:'#f59e0b',Low:'#16a34a'};
+  const SEG_ORDER=['Churned','High','Medium','Low'];
+  const rk=s=>{const i=SEG_ORDER.indexOf(s);return i<0?SEG_ORDER.length:i};
+  rd.sort((a,b)=>rk(a.risk_segment)-rk(b.risk_segment));
+  const rTotal=rd.reduce((a,r)=>a+Number(r.count),0)||1;
+  new Chart($("crisk"),{type:"bar",data:{labels:rd.map(r=>`${r.risk_segment} — ${Number(r.count).toLocaleString()} (${(r.count/rTotal*100).toFixed(1)}%)`),datasets:[{data:rd.map(r=>Number(r.count)),backgroundColor:rd.map(r=>SEG_COLORS[r.risk_segment]||'#94a3b8'),borderRadius:4,barThickness:22}]},options:{indexAxis:"y",animation:{duration:900,easing:"easeOutQuart"},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${Number(c.raw).toLocaleString()} customers`}}},scales:{x:{type:"logarithmic",min:1,ticks:{color:t,callback:v=>[1,10,100,1000,10000,100000].includes(v)?v.toLocaleString():""},grid:{color:g},title:{display:true,text:"Customers (log scale)",color:t}},y:{ticks:{color:t,font:{size:11.5}},grid:{display:false}}}}});
 
   const pd=await get("/api/churn_by_proba").catch(()=>({labels:[],churn:[],no_churn:[]}));
-  new Chart($("cproba"),{type:"bar",data:{labels:pd.labels,datasets:[{label:"Churned",data:pd.churn,backgroundColor:"rgba(239,68,68,.72)",borderRadius:3},{label:"Existing",data:pd.no_churn,backgroundColor:"rgba(37,99,235,.5)",borderRadius:3}]},options:{animation:{duration:900,easing:"easeOutQuart"},plugins:{legend:{labels:{color:t,padding:12,font:{size:11}}}},scales:{x:{ticks:{color:t,maxRotation:45,font:{size:9}},grid:{display:false}},y:{ticks:{color:t},grid:{color:g}}}}});
-
+    new Chart($("cproba"),{type:"bar",data:{labels:pd.labels,datasets:[{label:"Churned",data:pd.churn,backgroundColor:"rgba(239,68,68,.72)",borderRadius:3},{label:"Existing",data:pd.no_churn,backgroundColor:"rgba(37,99,235,.5)",borderRadius:3}]},options:{animation:{duration:900,easing:"easeOutQuart"},plugins:{legend:{labels:{color:t,padding:12,font:{size:11}}},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${Number(c.raw).toLocaleString()}`}}},scales:{x:{ticks:{color:t,maxRotation:45,font:{size:9}},grid:{display:false}},y:{type:"logarithmic",min:1,ticks:{color:t,callback:v=>[1,10,100,1000,10000,100000].includes(v)?v.toLocaleString():""},grid:{color:g},title:{display:true,text:"Customers (log scale)",color:t}}}}});
   const sd=await get("/api/top_features").catch(()=>[]);
   new Chart($("cshap"),{type:"bar",data:{labels:sd.map(d=>d.feature_name),datasets:[{label:"Mean |SHAP|",data:sd.map(d=>d.mean_abs_shap),backgroundColor:sd.map((_,i)=>`rgba(37,99,235,${1-i*0.07})`),borderRadius:4}]},options:{indexAxis:"y",animation:{duration:1100,easing:"easeOutQuart"},plugins:{legend:{display:false}},scales:{x:{ticks:{color:t,font:{size:10}},grid:{color:g}},y:{ticks:{color:document.body.classList.contains("dark")?"#e8edf5":"#334155",font:{size:10.5}},grid:{display:false}}}}});
 }
@@ -621,24 +623,19 @@ document.querySelectorAll(".fbtn").forEach(b=>{
   });
 });
 
-// Download CSV
-function downloadCSV(){
-  const seg=curSeg;
-  const url=`/api/customers/download${seg?'?segment='+encodeURIComponent(seg):''}`;
-  const a=document.createElement('a');
-  a.href=url;
-  a.download=seg?`churn_${seg.toLowerCase()}_predictions.csv`:'churn_all_predictions.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-}
-
 // Modal
+function esc(v){return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+function fmtVal(v){
+  if(v===null||v===undefined||v==="")return "—";
+  if(typeof v==="number")return Number.isInteger(v)?v.toLocaleString():(+v.toFixed(4)).toLocaleString();
+  return esc(v);
+}
 async function showRec(id){
   $("modal").classList.add("open");
   $("mtit").textContent=`Record ${id}`;
   $("mdtl").innerHTML='<div style="grid-column:span 2;text-align:center;padding:20px"><div class="spin"></div></div>';
   $("mshap").innerHTML="";
+  $("mrec").innerHTML="";
   const data=await get(`/api/customer/${id}`).catch(()=>({}));
   const p=data.prediction||{};
   const pr=((p.churn_proba||0)*100).toFixed(1);
@@ -648,6 +645,11 @@ async function showRec(id){
     <div class="dbox"><div class="dlbl">Risk Segment</div><div class="dval">${p.risk_segment||"—"}</div></div>
     <div class="dbox"><div class="dlbl">Predicted</div><div class="dval">${p.churn_predicted?"Will Churn":"Will Stay"}</div></div>
     <div class="dbox"><div class="dlbl">Actual</div><div class="dval">${p.churn_actual?"Churned":"Existing"}</div></div>`;
+  // Original uploaded record
+  const rec=Object.entries(data.record||{}).filter(([k])=>!k.startsWith("_"));
+  $("mrec").innerHTML=rec.length
+    ?rec.map(([k,v])=>`<div class="rrow"><span class="rk" title="${esc(k)}">${esc(k)}</span><span class="rv">${fmtVal(v)}</span></div>`).join("")
+    :'<div style="grid-column:span 2;color:var(--t3);font-size:12px">No original record found.</div>';
   if(data.shap&&data.shap.length){
     const mx=Math.max(...data.shap.map(s=>Math.abs(s.shap_value)));
     $("mshap").innerHTML=data.shap.map(s=>{
