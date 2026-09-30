@@ -42,7 +42,7 @@ def api_summary():
     try:
         pred = qry("""
             SELECT COUNT(*) AS total_scored,
-                   SUM(churn_actual) AS predicted_churners,
+                   SUM(churn_predicted) AS predicted_churners,
                    SUM(CASE WHEN risk_segment='Churned' THEN 1 ELSE 0 END) AS already_churned,
                    SUM(CASE WHEN risk_segment='High'    THEN 1 ELSE 0 END) AS high_risk,
                    SUM(CASE WHEN risk_segment='Medium'  THEN 1 ELSE 0 END) AS medium_risk,
@@ -249,8 +249,16 @@ def api_customer_detail(client_id):
             raw = pd.read_sql(raw_sql, conn, params={"client_id": str(client_id)})
             shap = pd.read_sql(shap_sql, conn, params={"client_id": str(client_id)})
 
-        prediction = pred.iloc[0].to_dict() if not pred.empty else {}
-        record = raw.iloc[0].to_dict() if not raw.empty else {}
+        def clean(df):
+            # NaN/NaT are not valid JSON; convert to None so the browser can parse it
+            if df.empty:
+                return {}
+            # Series.to_dict() returns native Python types (numpy ints aren't JSON-serializable)
+            row = df.iloc[0].to_dict()
+            return {k: (None if pd.isna(v) else v) for k, v in row.items()}
+
+        prediction = clean(pred)
+        record = clean(raw)
         return jsonify({
             "prediction": prediction,
             "record": record,
