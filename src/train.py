@@ -30,12 +30,12 @@ def build_logistic():
 def build_xgb():
     return Pipeline([
         ("clf", XGBClassifier(
-            n_estimators=100,       # reduced from 300
+            n_estimators=250,       # enough capacity for larger datasets
             max_depth=4,            # reduced from 6
             learning_rate=0.1,
             subsample=0.8,
             colsample_bytree=0.8,
-            scale_pos_weight=5,
+            scale_pos_weight=1,     # SMOTE already balances the training set
             eval_metric="logloss",
             random_state=RANDOM_STATE,
             verbosity=0,
@@ -52,11 +52,14 @@ MODELS = {
 
 
 def train_all(X_train, y_train, tune_xgb=False):
-    # Use at most 3000 rows for training on free tier
-    if len(X_train) > 3000:
-        log.info(f"  Sampling 3000 rows from {len(X_train):,} for speed")
+    # Cap training for Render/free-tier runtime, but use substantially more
+    # information than the old 3,000-row cap. The full dataset is still
+    # scored below; this cap affects training only.
+    TRAIN_CAP = 15000
+    if len(X_train) > TRAIN_CAP:
+        log.info(f"  Sampling {TRAIN_CAP:,} rows from {len(X_train):,} for training")
         idx = np.random.RandomState(RANDOM_STATE).choice(
-            len(X_train), 3000, replace=False
+            len(X_train), TRAIN_CAP, replace=False
         )
         X_tr = X_train.iloc[idx] if hasattr(X_train, "iloc") else X_train[idx]
         y_tr = y_train.iloc[idx] if hasattr(y_train, "iloc") else y_train[idx]
