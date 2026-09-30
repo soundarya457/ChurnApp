@@ -1,7 +1,6 @@
-
-import os, base64, threading, traceback, json
+import os, base64, threading, traceback, json, io
 from pathlib import Path
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, Response
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine, text
@@ -95,6 +94,15 @@ def api_summary():
         except Exception:
             pass
 
+        # Use held-out evaluation metrics for model quality.
+        test_metrics = {}
+        try:
+            metrics_path = OUTPUT_DIR / "metrics.json"
+            if metrics_path.exists():
+                test_metrics = json.loads(metrics_path.read_text()).get("test_metrics", {})
+        except Exception:
+            pass
+
         return jsonify({
             "total_raw":          int(raw_total or 0),
             "total_scored":       int(pred["total_scored"]       or 0),
@@ -105,9 +113,9 @@ def api_summary():
             "medium_risk":        int(pred["medium_risk"]        or 0),
             "low_risk":           int(pred["low_risk"]           or 0),
             "best_model":         str(pred["model_name"]         or ""),
-            "accuracy":           float(pred["accuracy"]         or 0),
-            "precision":          float(pred["precision_val"]    or 0),
-            "recall":             float(pred["recall_val"]       or 0),
+            "accuracy":           float(test_metrics.get("accuracy", pred["accuracy"] or 0)),
+            "precision":          float(test_metrics.get("precision", pred["precision_val"] or 0)),
+            "recall":             float(test_metrics.get("recall", pred["recall_val"] or 0)),
             "false_negatives":    int(pred["false_negatives"]    or 0),
             "avg_churn_proba":    float(pred["avg_churn_proba_pct"] or 0),
             "avg_age_churned":    avg_age_churned,
@@ -177,22 +185,33 @@ def api_customers():
 
 @app.route("/api/customers/download")
 def api_customers_download():
-    """Download ALL predictions as CSV."""
-    segment = request.args.get("segment", "")
-    where   = f"WHERE risk_segment='{segment}'" if segment else ""
+    """Download the complete risk table: every raw customer field + prediction fields."""
+    segment = request.args.get("segment", "").strip()
     try:
-        df = qry(f"""
-            SELECT CLIENTNUM, churn_actual, churn_proba, churn_predicted,
-                   risk_segment, model_name, scored_at
-            FROM churn_predictions {where}
-            ORDER BY churn_proba DESC
+        id_col = SCHEMA.get("id_col") or "_row_id"
+        # Use a parameter for the filter; quote the dynamic column identifier.
+        seg_clause = "WHERE p.risk_segment = :segment" if segment else ""
+        sql = text(f"""
+            SELECT r.*,
+                   p.churn_actual,
+                   p.churn_proba,
+                   p.churn_predicted,
+                   p.risk_segment,
+                   p.model_name,
+                   p.scored_at
+            FROM raw_data r
+            INNER JOIN churn_predictions p
+              ON CAST(r.`{id_col}` AS CHAR) = p.CLIENTNUM
+            {seg_clause}
+            ORDER BY p.churn_proba DESC
         """)
-        from flask import Response
-        import io
+        with engine.connect() as conn:
+            df = pd.read_sql(sql, conn, params={"segment": segment} if segment else {})
+
         output = io.StringIO()
         df.to_csv(output, index=False)
         output.seek(0)
-        fname = f"churn_predictions{'_'+segment if segment else ''}.csv"
+        fname = f"churn_risk_table{'_'+segment if segment else ''}.csv"
         return Response(
             output.getvalue(),
             mimetype="text/csv",
@@ -202,15 +221,41 @@ def api_customers_download():
         return jsonify({"error": str(e)}), 500
 
 
-
-
+@app.route("/api/customer/<path:client_id>")
 def api_customer_detail(client_id):
+    """Return prediction + original uploaded-record fields + SHAP details."""
     try:
-        pred = qry(f"SELECT * FROM churn_predictions WHERE CLIENTNUM='{client_id}'").to_dict(orient="records")
-        shap = qry(f"""SELECT feature_name,shap_value,feature_value,rank_order
-                       FROM shap_explanations WHERE CLIENTNUM='{client_id}'
-                       ORDER BY rank_order""").to_dict(orient="records")
-        return jsonify({"prediction":pred[0] if pred else {},"shap":shap})
+        id_col = SCHEMA.get("id_col") or "_row_id"
+        pred_sql = text("""
+            SELECT *
+            FROM churn_predictions
+            WHERE CLIENTNUM = :client_id
+            LIMIT 1
+        """)
+        raw_sql = text(f"""
+            SELECT *
+            FROM raw_data
+            WHERE CAST(`{id_col}` AS CHAR) = :client_id
+            LIMIT 1
+        """)
+        shap_sql = text("""
+            SELECT feature_name, shap_value, feature_value, rank_order
+            FROM shap_explanations
+            WHERE CLIENTNUM = :client_id
+            ORDER BY rank_order
+        """)
+        with engine.connect() as conn:
+            pred = pd.read_sql(pred_sql, conn, params={"client_id": str(client_id)})
+            raw = pd.read_sql(raw_sql, conn, params={"client_id": str(client_id)})
+            shap = pd.read_sql(shap_sql, conn, params={"client_id": str(client_id)})
+
+        prediction = pred.iloc[0].to_dict() if not pred.empty else {}
+        record = raw.iloc[0].to_dict() if not raw.empty else {}
+        return jsonify({
+            "prediction": prediction,
+            "record": record,
+            "shap": shap.to_dict(orient="records")
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -306,18 +351,21 @@ def api_run_pipeline():
             X_train, X_test, y_train, y_test, feature_names, X_full, y_full = preprocess.run()
             log_s(f"  {len(feature_names)} features | Train: {len(X_train):,} | Test: {len(X_test):,}", progress=35)
 
-            # Fetch IDs
+            # Fetch IDs in the exact order of X_test. preprocess.run() keeps
+            # the original row index on X_test, so this avoids mismatched SHAP
+            # explanations caused by re-splitting IDs independently.
             from sqlalchemy import create_engine as CE
-            from src.config import TEST_SIZE, RANDOM_STATE, SCHEMA as SC
-            from sklearn.model_selection import train_test_split
+            from src.config import SCHEMA as SC
             eng2 = CE(DB_URL)
             id_col = SC.get("id_col")
             if id_col:
-                all_ids = pd.read_sql(f"SELECT `{id_col}` FROM features ORDER BY `{id_col}`", eng2)
-                _, test_ids = train_test_split(all_ids[id_col].values, test_size=TEST_SIZE, random_state=RANDOM_STATE)
+                id_frame = pd.read_sql(
+                    f"SELECT `_source_row`, `{id_col}` FROM features ORDER BY `_source_row`",
+                    eng2
+                )
+                test_ids = id_frame.loc[X_test.index, id_col].astype(str).values
             else:
-                n = len(X_train) + len(X_test)
-                _, test_ids = train_test_split(list(range(n)), test_size=TEST_SIZE, random_state=RANDOM_STATE)
+                test_ids = X_test.index.to_numpy()
 
             # Stage 3 — Train
             log_s("Stage 3/6 — Training Logistic Regression, Random Forest, XGBoost, MLP...", "Training", 38)
