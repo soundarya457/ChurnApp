@@ -15,6 +15,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import cross_val_score
 from src.config import OUTPUT_DIR, CV_FOLDS
 import logging
+import json
 
 log = logging.getLogger(__name__)
 
@@ -89,4 +90,16 @@ def run(fitted, X_train, y_train, X_test, y_test):
     plot_cm(fitted, X_test, y_test)
     plot_metrics(all_metrics)
     best_name, best_model = pick_best(all_metrics, fitted)
+    # Persist held-out test metrics. Dashboard must not call predictions on
+    # the entire scored dataset "accuracy", because those rows include the
+    # training population and are not a generalization estimate.
+    try:
+        (OUTPUT_DIR / "metrics.json").write_text(json.dumps({
+            "all_metrics": all_metrics,
+            "cv": cv,
+            "best_model": best_name,
+            "test_metrics": next(m for m in all_metrics if m["model"] == best_name)
+        }))
+    except Exception as e:
+        log.warning(f"Could not save metrics.json: {e}")
     return all_metrics, cv, best_name, best_model
