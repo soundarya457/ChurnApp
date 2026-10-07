@@ -28,8 +28,16 @@ DB_URL = (
 
 # ── ML Settings ────────────────────────────────────────────────
 RANDOM_STATE = 42
+SOURCE_COL   = "_source_row"   # 0-based upload-order row identifier, kept end-to-end
+MIN_CLASS_ROWS = 20            # each target class needs at least this many rows
 TEST_SIZE    = 0.20
 CV_FOLDS     = 5
+# Model selection: the candidate with the highest cross-validated ACCURACY (measured on the
+# original, un-balanced training rows) wins -- but only if it also catches at least MIN_RECALL
+# of real churners. Without that floor, a model that predicts "nobody churns" can score ~85%
+# accuracy on imbalanced data while being useless. Set MIN_RECALL = 0 to select on accuracy alone.
+SELECTION_METRIC = "accuracy"    # "accuracy" | "f1" | "roc_auc"
+MIN_RECALL       = 0.30
 
 # ── Runtime schema (populated by ingest.py after CSV is read) ──
 # These are set dynamically — do NOT hardcode column names here.
