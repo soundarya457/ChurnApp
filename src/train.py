@@ -45,32 +45,30 @@ def build_xgb():
     ])
 
 
+def build_rf():
+    return Pipeline([
+        ("clf", RandomForestClassifier(
+            n_estimators=200, max_depth=14, min_samples_leaf=3,
+            max_features="sqrt", random_state=RANDOM_STATE, n_jobs=1,
+        ))
+    ])
+
+
 MODELS = {
     "LogisticRegression": build_logistic,
+    "RandomForest":       build_rf,
     "XGBoost":            build_xgb,
 }
 
 
 def train_all(X_train, y_train, tune_xgb=False):
-    # Cap training for Render/free-tier runtime, but use substantially more
-    # information than the old 3,000-row cap. The full dataset is still
-    # scored below; this cap affects training only.
-    TRAIN_CAP = 15000
-    if len(X_train) > TRAIN_CAP:
-        log.info(f"  Sampling {TRAIN_CAP:,} rows from {len(X_train):,} for training")
-        idx = np.random.RandomState(RANDOM_STATE).choice(
-            len(X_train), TRAIN_CAP, replace=False
-        )
-        X_tr = X_train.iloc[idx] if hasattr(X_train, "iloc") else X_train[idx]
-        y_tr = y_train.iloc[idx] if hasattr(y_train, "iloc") else y_train[idx]
-    else:
-        X_tr, y_tr = X_train, y_train
-
+    """Fit every candidate on the (already SMOTE-balanced) training split.
+    No further sampling here: the 15,000-row cap is applied once, before SMOTE."""
     fitted = {}
     for name, builder in MODELS.items():
         log.info(f"  Training {name}...")
         pipe = builder()
-        pipe.fit(X_tr, y_tr)
+        pipe.fit(X_train, y_train)
         fitted[name] = pipe
         log.info(f"  {name} done ✓")
 
@@ -81,3 +79,4 @@ def train_all(X_train, y_train, tune_xgb=False):
 
 def load_models():
     return joblib.load(OUTPUT_DIR / "models.pkl")
+
