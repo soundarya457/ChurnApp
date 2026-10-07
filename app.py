@@ -1,10 +1,10 @@
-import os, base64, threading, traceback, json, io
+import os, base64, threading, traceback, json, io, hashlib
 from pathlib import Path
 from flask import Flask, render_template, jsonify, request, Response
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine, text
-from src.config import DB_URL, OUTPUT_DIR, DATA_DIR, SCHEMA
+from src.config import DB_URL, OUTPUT_DIR, DATA_DIR, SCHEMA, SOURCE_COL
 
 app    = Flask(__name__)
 engine = create_engine(DB_URL, echo=False, pool_pre_ping=True)
@@ -19,9 +19,33 @@ def img64(f):
     p = OUTPUT_DIR / f
     return base64.b64encode(p.read_bytes()).decode() if p.exists() else ""
 
-def qry(sql):
+def qry(sql, params=None):
     with engine.connect() as conn:
-        return pd.read_sql(text(sql), conn)
+        return pd.read_sql(text(sql), conn, params=params or {})
+
+UPLOAD_CSV    = DATA_DIR / "uploaded_dataset.csv"
+PENDING_FILE  = DATA_DIR / "pending_schema.json"
+CONFIRMED_FILE = DATA_DIR / "confirmed_schema.json"   # files (not memory) so it survives multiple workers
+
+def file_sha(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+def read_json(path):
+    try:
+        return json.loads(Path(path).read_text())
+    except Exception:
+        return None
+
+def confirmed_for_current_csv():
+    """Return the user's confirmed target selection only if it matches the CSV on disk."""
+    conf = read_json(CONFIRMED_FILE)
+    if conf and UPLOAD_CSV.exists() and conf.get("sha") == file_sha(UPLOAD_CSV):
+        return conf
+    return None
 
 def log_s(msg, stage="", progress=None):
     pipeline_status["log"].append(msg)
@@ -48,12 +72,13 @@ def api_summary():
                    SUM(CASE WHEN risk_segment='Medium'  THEN 1 ELSE 0 END) AS medium_risk,
                    SUM(CASE WHEN risk_segment='Low'     THEN 1 ELSE 0 END) AS low_risk,
                    MAX(model_name) AS model_name,
-                   ROUND(SUM(CASE WHEN churn_actual=churn_predicted THEN 1.0 ELSE 0 END)/COUNT(*),4) AS accuracy,
-                   ROUND(SUM(CASE WHEN churn_actual=1 AND churn_predicted=1 THEN 1.0 ELSE 0 END)
-                         /NULLIF(SUM(churn_predicted),0),4) AS precision_val,
-                   ROUND(SUM(CASE WHEN churn_actual=1 AND churn_predicted=1 THEN 1.0 ELSE 0 END)
-                         /NULLIF(SUM(churn_actual),0),4) AS recall_val,
-                   SUM(CASE WHEN churn_actual=1 AND churn_predicted=0 THEN 1 ELSE 0 END) AS false_negatives,
+                   ROUND(SUM(CASE WHEN data_split='test' AND churn_actual=churn_predicted THEN 1.0 ELSE 0 END)
+                         /NULLIF(SUM(data_split='test'),0),4) AS accuracy,
+                   ROUND(SUM(CASE WHEN data_split='test' AND churn_actual=1 AND churn_predicted=1 THEN 1.0 ELSE 0 END)
+                         /NULLIF(SUM(CASE WHEN data_split='test' THEN churn_predicted ELSE 0 END),0),4) AS precision_val,
+                   ROUND(SUM(CASE WHEN data_split='test' AND churn_actual=1 AND churn_predicted=1 THEN 1.0 ELSE 0 END)
+                         /NULLIF(SUM(CASE WHEN data_split='test' THEN churn_actual ELSE 0 END),0),4) AS recall_val,
+                   SUM(CASE WHEN data_split='test' AND churn_actual=1 AND churn_predicted=0 THEN 1 ELSE 0 END) AS false_negatives,
                    ROUND(AVG(churn_proba)*100,1) AS avg_churn_proba_pct
             FROM churn_predictions
         """).iloc[0]
@@ -116,7 +141,10 @@ def api_summary():
             "accuracy":           float(test_metrics.get("accuracy", pred["accuracy"] or 0)),
             "precision":          float(test_metrics.get("precision", pred["precision_val"] or 0)),
             "recall":             float(test_metrics.get("recall", pred["recall_val"] or 0)),
-            "false_negatives":    int(pred["false_negatives"]    or 0),
+            "f1":                 float(test_metrics.get("f1", 0)),
+            "roc_auc":            float(test_metrics.get("roc_auc", 0)),
+            "confusion_matrix":   test_metrics.get("confusion_matrix"),
+            "false_negatives":    int((test_metrics.get("confusion_matrix") or {}).get("fn", pred["false_negatives"] or 0)),
             "avg_churn_proba":    float(pred["avg_churn_proba_pct"] or 0),
             "avg_age_churned":    avg_age_churned,
             "avg_age_existing":   avg_age_existing,
@@ -164,15 +192,16 @@ def api_customers():
     per_page = int(request.args.get("per_page", 50))
     segment  = request.args.get("segment", "")
     offset   = (page - 1) * per_page
-    where    = f"WHERE risk_segment='{segment}'" if segment else ""
+    where    = "WHERE risk_segment = :segment" if segment else ""
+    params   = {"segment": segment} if segment else {}
     try:
-        total = qry(f"SELECT COUNT(*) AS n FROM churn_predictions {where}").iloc[0]["n"]
+        total = qry(f"SELECT COUNT(*) AS n FROM churn_predictions {where}", params).iloc[0]["n"]
         df    = qry(f"""
             SELECT CLIENTNUM, churn_actual, churn_proba, churn_predicted, risk_segment
             FROM churn_predictions {where}
             ORDER BY churn_proba DESC
-            LIMIT {per_page} OFFSET {offset}
-        """)
+            LIMIT {int(per_page)} OFFSET {int(offset)}
+        """, params)
         return jsonify({
             "total":     int(total),
             "page":      page,
@@ -207,6 +236,7 @@ def api_customers_download():
         """)
         with engine.connect() as conn:
             df = pd.read_sql(sql, conn, params={"segment": segment} if segment else {})
+        df = df.drop(columns=[SOURCE_COL], errors="ignore")
 
         output = io.StringIO()
         df.to_csv(output, index=False)
@@ -258,7 +288,7 @@ def api_customer_detail(client_id):
             return {k: (None if pd.isna(v) else v) for k, v in row.items()}
 
         prediction = clean(pred)
-        record = clean(raw)
+        record = clean(raw.drop(columns=[SOURCE_COL], errors="ignore"))
         return jsonify({
             "prediction": prediction,
             "record": record,
@@ -276,52 +306,91 @@ def api_plot(name):
 
 # ── Upload + Pipeline ──────────────────────────────────────────
 
+@app.route("/api/model_metrics")
+def api_model_metrics():
+    """Held-out test metrics (accuracy/precision/recall/F1/confusion matrix) + leakage report."""
+    return jsonify({
+        "metrics": read_json(OUTPUT_DIR / "metrics.json"),
+        "split":   read_json(OUTPUT_DIR / "split_report.json"),
+    })
+
+
 @app.route("/api/upload_dataset", methods=["POST"])
 def api_upload_dataset():
+    """Step 1: store the CSV and RECOMMEND target columns. Nothing is trained yet."""
     if "file" not in request.files:
         return jsonify({"error":"No file provided"}), 400
     f = request.files["file"]
     if not f.filename.lower().endswith(".csv"):
         return jsonify({"error":"Only CSV files are supported"}), 400
     try:
+        from src import ingest as _ing
         df = pd.read_csv(f)
         if len(df) < 50:
             return jsonify({"error":"Dataset too small — need at least 50 rows"}), 400
         if len(df.columns) < 3:
             return jsonify({"error":"Dataset needs at least 3 columns"}), 400
 
-        # Auto-detect schema on upload for preview
-        from src import ingest as _ing
-        _ing.detect_schema(df)
+        id_col = _ing.detect_id_col(df)
+        candidates, rec = _ing.find_target_candidates(df, id_col)
+        if not candidates:
+            return jsonify({"error":"No possible target column found. The target needs a column with exactly 2 distinct values (churn / not churn)."}), 400
 
-        target_col = SCHEMA.get("target_col")
-        target_pos = SCHEMA.get("target_positive")
-        id_col     = SCHEMA.get("id_col")
-
-        if not target_col:
-            return jsonify({"error":"Could not detect a binary target column. Ensure your dataset has a column with exactly 2 unique values indicating churn vs non-churn."}), 400
-
-        churn_count = int((df[target_col].astype(str) == str(target_pos)).sum())
-
-        # Save CSV
-        save_path = DATA_DIR / "uploaded_dataset.csv"
-        df.to_csv(save_path, index=False)
+        df.to_csv(UPLOAD_CSV, index=False)
+        if CONFIRMED_FILE.exists():
+            CONFIRMED_FILE.unlink()          # a new file always needs a new confirmation
+        PENDING_FILE.write_text(json.dumps({"sha": file_sha(UPLOAD_CSV), "filename": f.filename}))
 
         return jsonify({
-            "success":      True,
-            "rows":         len(df),
-            "columns":      len(df.columns),
-            "filename":     f.filename,
-            "target_col":   target_col,
-            "target_pos":   str(target_pos),
-            "id_col":       str(id_col) if id_col else "auto-generated",
-            "churn_count":  churn_count,
-            "churn_rate":   round(churn_count/len(df)*100, 1),
-            "cat_cols":     SCHEMA["categorical_cols"],
-            "num_cols":     SCHEMA["numerical_cols"],
+            "success": True,
+            "requires_confirmation": True,
+            "rows": len(df), "columns": len(df.columns), "filename": f.filename,
+            "id_col": str(id_col) if id_col else "auto-generated",
+            "duplicate_ids": _ing.count_duplicate_ids(df, id_col),
+            "candidates": candidates,
+            "recommendation": rec,
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/confirm_target", methods=["POST"])
+def api_confirm_target():
+    """Step 2: user picks the target column + which value means churn. Re-validated server-side."""
+    body = request.get_json(silent=True) or {}
+    col, pos = body.get("target_col"), body.get("positive_label")
+    if not col or pos is None:
+        return jsonify({"error":"Choose a target column and the value that means churn."}), 400
+    if not UPLOAD_CSV.exists() or not PENDING_FILE.exists():
+        return jsonify({"error":"Upload a dataset first."}), 400
+    try:
+        from src import ingest as _ing
+        df = pd.read_csv(UPLOAD_CSV)
+        id_col = _ing.detect_id_col(df)
+        ok, errors, warnings, info = _ing.validate_target(df, col, pos, id_col)
+        if not ok:
+            return jsonify({"error":" ".join(errors), "errors":errors}), 400
+        cat_cols, num_cols, drop_cols = _ing.detect_col_types(df, id_col, col)
+        conf = {
+            "sha": file_sha(UPLOAD_CSV), "target_col": col, "positive_label": info["positive"],
+            "n_positive": info["n_positive"], "n_negative": info["n_negative"],
+            "churn_rate": info["churn_rate"], "warnings": warnings,
+        }
+        CONFIRMED_FILE.write_text(json.dumps(conf))
+        return jsonify({
+            "success": True, **conf,
+            "class_distribution": info["values"],
+            "id_col": str(id_col) if id_col else "auto-generated",
+            "cat_cols": cat_cols, "num_cols": num_cols, "drop_cols": drop_cols,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/schema_state")
+def api_schema_state():
+    conf = confirmed_for_current_csv()
+    return jsonify({"confirmed": bool(conf), "selection": conf})
 
 
 @app.route("/api/run_pipeline", methods=["POST"])
@@ -329,84 +398,26 @@ def api_run_pipeline():
     global pipeline_status
     if pipeline_status["running"]:
         return jsonify({"error":"Pipeline already running"}), 400
+    conf = confirmed_for_current_csv()
+    if not conf:
+        return jsonify({"error":"Confirm the target column (and which value means churn) before training."}), 400
 
     pipeline_status = {"running":True,"stage":"Starting","progress":0,"log":[],"error":"","done":False}
 
     def run():
         global pipeline_status
         try:
-            import importlib, sys
-
-            def fresh(mod):
-                if mod in sys.modules: del sys.modules[mod]
-                return importlib.import_module(mod)
-
-            # Stage 1 — Ingest
-            log_s("Stage 1/6 — Loading dataset into MySQL...", "Ingesting", 8)
-            ingest = fresh("src.ingest")
-            csv_path = DATA_DIR / "uploaded_dataset.csv"
-            if not csv_path.exists():
-                # Fallback to any CSV in data/
-                csvs = sorted(DATA_DIR.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
-                if not csvs: raise FileNotFoundError("No dataset found. Please upload a CSV first.")
-                csv_path = csvs[0]
-            ingest.run(csv_path)
-            log_s(f"  Target: '{SCHEMA['target_col']}' | ID: '{SCHEMA['id_col']}'", progress=16)
-
-            # Stage 2 — Preprocess
-            log_s("Stage 2/6 — Feature engineering + SMOTE balancing...", "Preprocessing", 20)
-            preprocess = fresh("src.preprocess")
-            X_train, X_test, y_train, y_test, feature_names, X_full, y_full = preprocess.run()
-            log_s(f"  {len(feature_names)} features | Train: {len(X_train):,} | Test: {len(X_test):,}", progress=35)
-
-            # Fetch IDs in the exact order of X_test. preprocess.run() keeps
-            # the original row index on X_test, so this avoids mismatched SHAP
-            # explanations caused by re-splitting IDs independently.
-            from sqlalchemy import create_engine as CE
-            from src.config import SCHEMA as SC
-            eng2 = CE(DB_URL)
-            id_col = SC.get("id_col")
-            if id_col:
-                id_frame = pd.read_sql(
-                    f"SELECT `_source_row`, `{id_col}` FROM features ORDER BY `_source_row`",
-                    eng2
-                )
-                test_ids = id_frame.loc[X_test.index, id_col].astype(str).values
-            else:
-                test_ids = X_test.index.to_numpy()
-
-            # Stage 3 — Train
-            log_s("Stage 3/6 — Training Logistic Regression, Random Forest, XGBoost, MLP...", "Training", 38)
-            train_mod = fresh("src.train")
-            fitted = train_mod.train_all(X_train, y_train, tune_xgb=False)
-            log_s("  All 4 models trained.", progress=58)
-
-            # Stage 4 — Evaluate
-            log_s("Stage 4/6 — Evaluating and selecting best model...", "Evaluating", 62)
-            evaluate = fresh("src.evaluate")
-            all_metrics, cv, best_name, best_model = evaluate.run(fitted, X_train, y_train, X_test, y_test)
-            bm = next(m for m in all_metrics if m["model"]==best_name)
-            log_s(f"  Best: {best_name} | AUC={bm['roc_auc']} | F1={bm['f1']}", progress=72)
-
-            # Stage 5 — Explain
-            log_s("Stage 5/6 — Generating SHAP explanations...", "Explaining", 76)
-            explain = fresh("src.explain")
-            shap_df, _ = explain.run(best_name, best_model, X_train, X_test, feature_names, test_ids)
-            log_s("  SHAP complete.", progress=88)
-
-            # Stage 6 — Predict
-            log_s("Stage 6/6 — Writing predictions to MySQL...", "Saving", 91)
-            predict = fresh("src.predict")
-            pred_df = predict.run(
-                best_name, best_model,
-                X_test, y_test, test_ids, shap_df,
-                X_full=X_full, y_full=y_full
-            )
-            log_s(f"  {len(pred_df):,} total records scored (full dataset).", progress=100)
-
+            from src import pipeline
+            res = pipeline.run_pipeline(UPLOAD_CSV, conf["target_col"], conf["positive_label"], step=log_s)
+            m = res["metrics"]
             pipeline_status.update({"stage":"Complete","done":True,"running":False,
-                                    "best_model":best_name,"roc_auc":bm["roc_auc"],
-                                    "accuracy":bm["accuracy"],"scored":len(pred_df)})
+                                    "best_model":res["best_model"],"roc_auc":m["roc_auc"],
+                                    "accuracy":m["accuracy"],"precision":m["precision"],
+                                    "recall":m["recall"],"f1":m["f1"],
+                                    "confusion_matrix":m["confusion_matrix"],
+                                    "leaderboard":res["leaderboard"],
+                                    "selection_note":res["selection_note"],
+                                    "scored":res["scored"]})
         except Exception as e:
             pipeline_status.update({"error":str(e),"stage":"Error","running":False})
             pipeline_status["log"].append(f"ERROR: {traceback.format_exc()}")
