@@ -223,10 +223,77 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
 .aok{background:var(--greenlt);color:var(--green);border:1px solid #86efac}
 .aerr{background:var(--redlt);color:#b91c1c;border:1px solid #fca5a5}
 
+/* Target confirmation */
+.awarn{background:#fffbeb;color:#92400e;border:1px solid #fcd34d}
+body.dark .awarn{background:rgba(245,158,11,.12);color:#fcd34d;border-color:rgba(245,158,11,.4)}
+.tcl{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:8px}
+.tcc{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--sur);cursor:pointer;min-width:0}
+.tcc:hover{border-color:var(--bluemd)}
+.tcc:has(input:checked){border-color:var(--blue);background:var(--bluelt)}
+.tcc.bad{opacity:.55;cursor:not-allowed}
+.tcc input{margin-top:3px;flex-shrink:0}
+.tcm{min-width:0;flex:1}
+.tcn{font-weight:600;font-size:12.5px;overflow-wrap:anywhere;word-break:break-word}
+.tcv{font-size:11.5px;margin-top:3px}
+.tcval{display:inline-block;margin:1px 8px 1px 0}
+.tcnote{font-size:11px;color:var(--t3);margin-top:3px;overflow-wrap:anywhere}
+.tcnote .iss{color:var(--red);margin-top:2px}
+.tcpos{margin-top:12px;padding:12px 14px;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--rs);display:none}
+.tcpos label{display:inline-flex;align-items:center;gap:6px;margin-right:18px;font-size:12.5px;cursor:pointer}
+.distbar{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:8px 0 4px;background:var(--bdr)}
+.distbar span{display:block;height:100%}
+.evtbl td,.evtbl th{padding:8px 10px;font-size:12.5px;text-align:right}
+.evtbl td:first-child,.evtbl th:first-child{text-align:left}
+.lbd{margin-top:14px}
+.lbd .lbr{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(5,minmax(0,1fr));gap:6px;padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--rs);margin-bottom:6px;font-size:12px;align-items:center}
+.lbd .lbr.sel{border-color:var(--blue);background:var(--bluelt);font-weight:600}
+.lbd .lbr.lbh{border:0;color:var(--t3);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding-bottom:0}
+.lbd .lbr.off{opacity:.6}
+.lbd .lbr>div:not(:first-child){text-align:right}
+@media (max-width:700px){.lbd .lbr{grid-template-columns:1fr 1fr}.lbd .lbr.lbh{display:none}.lbd .lbr>div:first-child{grid-column:1/-1}.lbd .lbr>div:not(:first-child){text-align:left}.lbd .lbr>div[data-l]::before{content:attr(data-l)": ";color:var(--t3);font-weight:500}}
+.evtbl tr.best td{font-weight:700;background:var(--bluelt)}
 /* Spinner */
 .spin{display:inline-block;width:16px;height:16px;border:2px solid var(--bdr);border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 .ldc{text-align:center;padding:28px}
+
+/* ── RESPONSIVE: fit phone / tablet / laptop with no sideways scrolling ── */
+html,body{max-width:100%}
+body{height:100vh;height:100dvh;overflow:hidden}
+.mw,.pgwrap,.card,.cb,.ch,.upg>*,.g2>*{min-width:0}
+.mw{height:100vh;height:100dvh;width:0}
+.pgwrap{overflow-x:hidden;overflow-wrap:anywhere}
+.sb{height:100vh;height:100dvh}
+img,canvas,svg{max-width:100%}
+.pli img{width:100%;height:auto;display:block}
+.tw{overflow-x:visible}
+td,th{overflow-wrap:anywhere}
+.logbox,.dzsub,.dztit{overflow-wrap:anywhere}
+.pgr,.cust-toolbar,.topbar,.tbr{min-width:0}
+.sctag{max-width:100%;overflow-wrap:anywhere;white-space:normal;text-align:left;border-radius:12px}
+.modal{width:min(500px,calc(100vw - 24px))}
+@media (max-width:1200px){.kg5{grid-template-columns:repeat(3,1fr)}.resgrid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:1000px){.upg,.g2{grid-template-columns:1fr}.kg4{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:900px){.togbtn{display:none}.pgwrap{padding:12px 14px}.topbar{padding:0 14px}}
+@media (max-width:700px){
+  .tbdate{display:none}
+  .kg4,.kg5{grid-template-columns:repeat(2,1fr)}
+  .prvst{grid-template-columns:repeat(2,1fr)}
+  .rgrid{grid-template-columns:1fr}
+  .minirow{flex-wrap:wrap}.mini{flex:1 1 33%}
+  .dropz{padding:24px 14px}
+  .cb{padding:11px 12px 14px}
+  thead th,tbody td{padding:8px 8px;font-size:12px}
+  .evtbl thead{display:none}
+  .evtbl,.evtbl tbody{display:block;width:100%}
+  .evtbl tr{border:1px solid var(--bdr);border-radius:var(--rs);margin-bottom:8px;padding:6px 10px;display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  .evtbl td{display:flex;justify-content:space-between;gap:8px;padding:4px 0;text-align:right;border:0}
+  .evtbl td:first-child{grid-column:1/-1;font-weight:700;border-bottom:1px solid var(--bdr);margin-bottom:4px}
+  .evtbl td::before{content:attr(data-l);color:var(--t3);text-align:left;font-weight:500}
+  .evtbl td:first-child::before{content:""}
+}
+@media (max-width:480px){.spill{font-size:10px;padding:3px 8px}.tbtitle{font-size:13.5px}.kval{font-size:20px}}
+@media (max-width:360px){.kg4,.kg5,.resgrid,.prvst{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -298,7 +365,7 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
       <div class="kg4">
         <div class="kpi kb"><div class="klbl">Total Records</div><div class="kval vb" id="k-total">—</div><div class="ksub">In uploaded dataset</div></div>
         <div class="kpi kr"><div class="klbl">Actual Churn Rate</div><div class="kval vr" id="k-achurn">—</div><div class="ksub">Across all records</div></div>
-        <div class="kpi ka"><div class="klbl">Predicted Churn Rate</div><div class="kval va" id="k-pchurn">—</div><div class="ksub">On scored test set</div></div>
+        <div class="kpi ka"><div class="klbl">Predicted Churn Rate</div><div class="kval va" id="k-pchurn">—</div><div class="ksub">Across all scored records</div></div>
         <div class="kpi kg"><div class="klbl">Model Accuracy</div><div class="kval vg" id="k-acc">—</div><div class="ksub" id="k-mname">Best model</div></div>
       </div>
       <div class="seclbl">Prediction Intelligence</div>
@@ -307,7 +374,7 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
         <div class="kpi kb"><div class="klbl">Avg Age — Existing</div><div class="kval vb" id="k-agee">—</div><div class="ksub">Years old</div></div>
         <div class="kpi kt"><div class="klbl">Avg Credit Limit</div><div class="kval vt" id="k-credit">—</div><div class="ksub">All records</div></div>
         <div class="kpi ka"><div class="klbl">Avg Transactions</div><div class="kval va" id="k-trans">—</div><div class="ksub">Per customer</div></div>
-        <div class="kpi kp"><div class="klbl">Missed Churners</div><div class="kval vp" id="k-fn">—</div><div class="ksub">False negatives</div></div>
+        <div class="kpi kp"><div class="klbl">Missed Churners</div><div class="kval vp" id="k-fn">—</div><div class="ksub">False negatives (held-out test)</div></div>
       </div>
       <div class="g2">
         <div class="card">
@@ -317,6 +384,7 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
             <div class="mini"><div class="mv" id="ms-pr" style="color:var(--blue)">—</div><div class="ml">Precision</div></div>
             <div class="mini"><div class="mv" id="ms-re" style="color:var(--green)">—</div><div class="ml">Recall</div></div>
             <div class="mini"><div class="mv" id="ms-ac" style="color:var(--amber)">—</div><div class="ml">Accuracy</div></div>
+            <div class="mini"><div class="mv" id="ms-f1" style="color:var(--purple)">—</div><div class="ml">F1</div></div>
           </div>
         </div>
         <div class="card">
@@ -364,6 +432,10 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
 
     <!-- MODEL EVAL -->
     <div class="pg" id="page-plots">
+      <div class="card" style="margin-bottom:11px">
+        <div class="ch"><div class="ct">Held-out Test Metrics</div><div class="csu">Accuracy is shown with precision, recall, F1 and the confusion matrix — recall = share of real churners caught</div></div>
+        <div class="cb"><div class="tw" id="p-evtbl"><div class="plph"><div class="spin"></div></div></div><div id="p-split" style="font-size:12px;color:var(--t2);margin-top:10px"></div></div>
+      </div>
       <div class="g2" style="margin-bottom:11px">
         <div class="card sp2"><div class="ch"><div class="ct">Model Performance Comparison</div></div><div class="cb pli" id="p-metrics"><div class="plph"><div class="spin"></div></div></div></div>
       </div>
@@ -404,8 +476,12 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
               <button class="upbtn" id="upbtn" disabled>Upload Dataset</button>
             </div>
           </div>
+          <div class="card" id="target-card" style="display:none">
+            <div class="ch"><div class="ct">Confirm Target Column</div><div class="csu">Auto-detection is only a recommendation — confirm what counts as churn before training</div></div>
+            <div class="cb" id="tc-body"></div>
+          </div>
           <div class="card" id="schema-card" style="display:none">
-            <div class="ch"><div class="ct">Auto-Detected Schema</div><div class="csu">Columns identified automatically from your file</div></div>
+            <div class="ch"><div class="ct">Confirmed Schema</div><div class="csu">Target confirmed by you; feature types detected from your file</div></div>
             <div class="cb" id="schema-body"></div>
           </div>
         </div>
@@ -413,8 +489,8 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
           <div class="ch"><div class="ct">How It Works</div><div class="csu">Upload any CSV and the app handles everything</div></div>
           <div class="cb">
             <div class="steps">
-              <div class="step"><div class="stpn">1</div><div><div class="stpt">Upload any CSV dataset</div><div class="stpd">Drop any CSV file — no configuration needed. The app automatically detects your ID column, binary target column, categorical features, and numerical features. Works with any domain.</div></div></div>
-              <div class="step"><div class="stpn">2</div><div><div class="stpt">Run the ML pipeline</div><div class="stpd">Click Run Pipeline to trigger all 6 automated stages: load into MySQL, feature engineering, SMOTE class balancing, train models, evaluate, generate SHAP explanations.</div></div></div>
+              <div class="step"><div class="stpn">1</div><div><div class="stpt">Upload any CSV dataset</div><div class="stpd">Drop any CSV file — no configuration needed. The app detects your ID column and recommends possible target columns. You confirm the target and which value means churn before anything is trained.</div></div></div>
+              <div class="step"><div class="stpn">2</div><div><div class="stpt">Run the ML pipeline</div><div class="stpd">Click Run Pipeline (enabled after you confirm the target): load into MySQL, split train/test, SMOTE on the training split only, train, evaluate on held-out data, generate SHAP explanations.</div></div></div>
               <div class="step"><div class="stpn">3</div><div><div class="stpt">Explore predictions</div><div class="stpd">Navigate to Overview for KPIs, Customer Risk Table for all predictions, Model Evaluation for ROC curves, and SHAP Explainability.</div></div></div>
             </div>
           </div>
@@ -427,12 +503,13 @@ body.dark .sc-cat{color:#c4b5fd}body.dark .sc-num{color:#67e8f9}body.dark .sc-id
       <div class="card">
         <div class="ch"><div class="ct">ML Pipeline</div><div class="csu">Train and score on your uploaded dataset</div></div>
         <div class="cb">
-          <button class="runbtn" id="runbtn">Run Full Pipeline</button>
+          <button class="runbtn" id="runbtn" disabled title="Confirm the target column first">Run Full Pipeline</button>
           <div id="pipeprg" style="display:none">
             <div class="stgtxt" id="stgtxt">Initialising...</div>
             <div class="prgwrap"><div class="prgbar" id="prgbar"></div></div>
             <div class="logbox" id="logbox"></div>
             <div class="resgrid" id="resgrid" style="display:none"></div>
+            <div class="lbd" id="lbd"></div>
           </div>
         </div>
       </div>
@@ -474,8 +551,10 @@ $("thbtn").onclick=()=>applyTheme(!document.body.classList.contains("dark"));
 
 // Sidebar collapse
 let col=localStorage.getItem("cs")==="1";
-function applySB(){$("sb").classList.toggle("col",col);$("mw").classList.toggle("exp",col);localStorage.setItem("cs",col?"1":"0")}
+const smallMQ=window.matchMedia("(max-width:900px)");
+function applySB(){const c=col||smallMQ.matches;$("sb").classList.toggle("col",c);$("mw").classList.toggle("exp",c);try{localStorage.setItem("cs",col?"1":"0")}catch(e){}}
 applySB();
+(smallMQ.addEventListener?smallMQ.addEventListener("change",applySB):smallMQ.addListener(applySB));
 $("togbtn").onclick=()=>{col=!col;applySB()};
 
 // Navigation
@@ -524,10 +603,12 @@ async function loadDashboard(){
   $("ms-pr").textContent=((s.precision||0)*100).toFixed(1)+"%";
   $("ms-re").textContent=((s.recall||0)*100).toFixed(1)+"%";
   $("ms-ac").textContent=((s.accuracy||0)*100).toFixed(1)+"%";
+  $("ms-f1").textContent=((s.f1||0)*100).toFixed(1)+"%";
 
   const t=tc(),g=gc();
 
-  new Chart($("cmodel"),{type:"bar",data:{labels:["Accuracy","Precision","Recall"],datasets:[{data:[+((s.accuracy||0)*100).toFixed(1),+((s.precision||0)*100).toFixed(1),+((s.recall||0)*100).toFixed(1)],backgroundColor:["rgba(245,158,11,.8)","rgba(37,99,235,.8)","rgba(22,163,74,.8)"],borderRadius:5}]},options:{animation:{duration:900,easing:"easeOutQuart"},plugins:{legend:{display:false}},scales:{x:{ticks:{color:t},grid:{display:false}},y:{min:0,max:100,ticks:{color:t,callback:v=>v+"%"},grid:{color:g}}}}});
+  new Chart($("cmodel"),{type:"bar",data:{labels:["Accuracy","Precision","Recall","F1"],datasets:[{data:[+((s.accuracy||0)*100).toFixed(1),+((s.precision||0)*100).toFixed(1),+((s.recall||0)*100).toFixed(1),+((s.f1||0)*100).toFixed(1)],backgroundColor:["rgba(245,158,11,.8)","rgba(37,99,235,.8)","rgba(22,163,74,.8)","rgba(124,58,237,.8)"],borderRadius:5}]},options:{animation:{duration:900,easing:"easeOutQuart"},plugins:{legend:{display:false}},scales:{x:{ticks:{color:t},grid:{display:false}},y:{min:0,max:100,ticks:{color:t,callback:v=>v+"%"},grid:{color:g}}}}});
+
   const rd=await get("/api/risk_distribution").catch(()=>[]);
   const SEG_COLORS={Churned:'#7c3aed',High:'#ef4444',Medium:'#f59e0b',Low:'#16a34a'};
   const SEG_ORDER=['Churned','High','Medium','Low'];
@@ -537,7 +618,7 @@ async function loadDashboard(){
   new Chart($("crisk"),{type:"bar",data:{labels:rd.map(r=>`${r.risk_segment} — ${Number(r.count).toLocaleString()} (${(r.count/rTotal*100).toFixed(1)}%)`),datasets:[{data:rd.map(r=>Number(r.count)),backgroundColor:rd.map(r=>SEG_COLORS[r.risk_segment]||'#94a3b8'),borderRadius:4,barThickness:22}]},options:{indexAxis:"y",animation:{duration:900,easing:"easeOutQuart"},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${Number(c.raw).toLocaleString()} customers`}}},scales:{x:{type:"logarithmic",min:1,ticks:{color:t,callback:v=>[1,10,100,1000,10000,100000].includes(v)?v.toLocaleString():""},grid:{color:g},title:{display:true,text:"Customers (log scale)",color:t}},y:{ticks:{color:t,font:{size:11.5}},grid:{display:false}}}}});
 
   const pd=await get("/api/churn_by_proba").catch(()=>({labels:[],churn:[],no_churn:[]}));
-    new Chart($("cproba"),{type:"bar",data:{labels:pd.labels,datasets:[{label:"Churned",data:pd.churn,backgroundColor:"rgba(239,68,68,.72)",borderRadius:3},{label:"Existing",data:pd.no_churn,backgroundColor:"rgba(37,99,235,.5)",borderRadius:3}]},options:{animation:{duration:900,easing:"easeOutQuart"},plugins:{legend:{labels:{color:t,padding:12,font:{size:11}}},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${Number(c.raw).toLocaleString()}`}}},scales:{x:{ticks:{color:t,maxRotation:45,font:{size:9}},grid:{display:false}},y:{type:"logarithmic",min:1,ticks:{color:t,callback:v=>[1,10,100,1000,10000,100000].includes(v)?v.toLocaleString():""},grid:{color:g},title:{display:true,text:"Customers (log scale)",color:t}}}}});
+  new Chart($("cproba"),{type:"bar",data:{labels:pd.labels,datasets:[{label:"Churned",data:pd.churn,backgroundColor:"rgba(239,68,68,.72)",borderRadius:3},{label:"Existing",data:pd.no_churn,backgroundColor:"rgba(37,99,235,.5)",borderRadius:3}]},options:{animation:{duration:900,easing:"easeOutQuart"},plugins:{legend:{labels:{color:t,padding:12,font:{size:11}}},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${Number(c.raw).toLocaleString()}`}}},scales:{x:{ticks:{color:t,maxRotation:45,font:{size:9}},grid:{display:false}},y:{type:"logarithmic",min:1,ticks:{color:t,callback:v=>[1,10,100,1000,10000,100000].includes(v)?v.toLocaleString():""},grid:{color:g},title:{display:true,text:"Customers (log scale)",color:t}}}}});
   const sd=await get("/api/top_features").catch(()=>[]);
   new Chart($("cshap"),{type:"bar",data:{labels:sd.map(d=>d.feature_name),datasets:[{label:"Mean |SHAP|",data:sd.map(d=>d.mean_abs_shap),backgroundColor:sd.map((_,i)=>`rgba(37,99,235,${1-i*0.07})`),borderRadius:4}]},options:{indexAxis:"y",animation:{duration:1100,easing:"easeOutQuart"},plugins:{legend:{display:false}},scales:{x:{ticks:{color:t,font:{size:10}},grid:{color:g}},y:{ticks:{color:document.body.classList.contains("dark")?"#e8edf5":"#334155",font:{size:10.5}},grid:{display:false}}}}});
 }
@@ -670,7 +751,32 @@ async function loadPlots(){
     const d=await get(`/api/plots/${n}`).catch(()=>({}));
     $(id).innerHTML=d.img?`<img src="data:image/png;base64,${d.img}">`:`<div class="plph">Run the pipeline to generate this chart.</div>`;
   };
-  await Promise.all([l("metrics_comparison","p-metrics"),l("roc_curves","p-roc"),l("confusion_matrices","p-conf")]);
+  await Promise.all([l("metrics_comparison","p-metrics"),l("roc_curves","p-roc"),l("confusion_matrices","p-conf"),loadEvalTable()]);
+}
+
+function leaderboardHTML(b,note){
+  const pc=v=>((v||0)*100).toFixed(1)+"%";
+  return `<div style="font-size:12px;font-weight:700;margin-bottom:8px">Model leaderboard — winner picked by cross-validated accuracy (training data only)</div>
+    <div class="lbr lbh"><div>Model</div><div>CV accuracy</div><div>Test accuracy</div><div>Recall</div><div>F1</div><div>ROC-AUC</div></div>`+
+    b.map(r=>`<div class="lbr ${r.selected?"sel":""} ${r.eligible?"":"off"}"><div>${r.selected?"★ ":""}${esc(r.model)}${r.selected?" (selected)":""}</div>
+      <div data-l="CV acc">${pc(r.cv_accuracy)}</div><div data-l="Test acc">${pc(r.test_accuracy)}</div><div data-l="Recall">${pc(r.test_recall)}</div><div data-l="F1">${pc(r.test_f1)}</div><div data-l="AUC">${(+r.test_roc_auc).toFixed(3)}</div></div>`).join("")+
+    (note?`<div style="font-size:11.5px;color:var(--t2);margin-top:6px">${esc(note)}</div>`:"");
+}
+
+async function loadEvalTable(){
+  const d=await get("/api/model_metrics").catch(()=>({}));
+  const m=d.metrics;
+  if(!m||!m.all_metrics){$("p-evtbl").innerHTML='<div class="plph">Run the pipeline to see held-out metrics.</div>';return}
+  const pc=v=>(v*100).toFixed(1)+"%";
+  const hd=["Model","Accuracy","Precision","Recall","F1","ROC-AUC","TN","FP","FN","TP"];
+  $("p-evtbl").innerHTML=(m.leaderboard?`<div class="lbd" style="margin:0 0 14px">${leaderboardHTML(m.leaderboard,m.selection_note)}</div>`:"")+`<table class="evtbl"><thead><tr>${hd.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>`+
+    m.all_metrics.map(r=>{const c=r.confusion_matrix||{};
+      const v=[esc(r.model)+(r.model===m.best_model?" ★":""),pc(r.accuracy),pc(r.precision),pc(r.recall),pc(r.f1),r.roc_auc,c.tn,c.fp,c.fn,c.tp];
+      return `<tr class="${r.model===m.best_model?"best":""}">${v.map((x,i)=>`<td data-l="${hd[i]}">${x}</td>`).join("")}</tr>`}).join("")+`</tbody></table>`;
+  const sp=d.split;
+  const warn=m.signal_warning?`<div class="alert awarn show" style="margin-bottom:10px">${esc(m.signal_warning)}</div>`:"";
+  const base=m.baseline_accuracy!=null?`<div style="margin-bottom:8px">Baseline: always predicting "no churn" scores <b>${pc(m.baseline_accuracy)}</b> accuracy — a useful model must beat this on recall/precision, not just accuracy.</div>`:"";
+  $("p-split").innerHTML=warn+base+(sp?`<b>Leakage check ${sp.passed?"passed ✓":"FAILED ✗"}</b> — train/test row overlap: ${sp.source_row_overlap}; train rows ${sp.train_rows_used.toLocaleString()} (+${sp.synthetic_rows_added.toLocaleString()} synthetic from SMOTE, train only); test rows ${sp.test_rows.toLocaleString()} untouched. ★ = selected model, chosen by cross-validated ${esc(m.selection_criterion||"accuracy")} (never by the test score).`:"");
 }
 
 // XAI
@@ -697,51 +803,135 @@ function setFile(f){selFile=f;$("dzfile").textContent=f.name+" ("+fmtB(f.size)+"
 function fmtB(b){if(b<1024)return b+"B";if(b<1048576)return(b/1024).toFixed(1)+"KB";return(b/1048576).toFixed(1)+"MB"}
 function hideAlerts(){$("aok").classList.remove("show");$("aerr").classList.remove("show")}
 
+let upData=null,tgtConfirmed=false;
+function setConfirmed(v){tgtConfirmed=v;$("runbtn").disabled=!v;$("runbtn").title=v?"":"Confirm the target column first"}
+
 upbtn.addEventListener("click",async()=>{
   if(!selFile)return;
   hideAlerts();upbtn.disabled=true;upbtn.textContent="Uploading...";
+  setConfirmed(false);$("schema-card").style.display="none";$("preview-card").style.display="none";
   const fd=new FormData();fd.append("file",selFile);
   try{
     const r=await fetch("/api/upload_dataset",{method:"POST",body:fd});
     const d=await r.json();
-    upbtn.textContent="Upload Dataset";
-    if(d.error){$("aerr").textContent=d.error;$("aerr").classList.add("show");upbtn.disabled=false;return}
-    $("aok").textContent=`Uploaded successfully — ${d.rows.toLocaleString()} rows, ${d.columns} columns detected.`;
-    $("aok").classList.add("show");
-    upbtn.disabled=false;
-    $("schema-card").style.display="block";
-    $("schema-body").innerHTML=`
-      <div style="margin-bottom:10px">
-        <span class="sctag sc-tgt">Target: ${d.target_col} = "${d.target_pos}"</span>
-        ${d.id_col?`<span class="sctag sc-id">ID: ${d.id_col}</span>`:""}
-      </div>
-      <div style="margin-bottom:6px;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.7px">Categorical Features (${(d.cat_cols||[]).length})</div>
-      <div style="margin-bottom:10px">${(d.cat_cols||[]).map(c=>`<span class="sctag sc-cat">${c}</span>`).join("")||'<span style="color:var(--t3);font-size:12px">None detected</span>'}</div>
-      <div style="margin-bottom:6px;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.7px">Numerical Features (${(d.num_cols||[]).length})</div>
-      <div>${(d.num_cols||[]).map(c=>`<span class="sctag sc-num">${c}</span>`).join("")||'<span style="color:var(--t3);font-size:12px">None detected</span>'}</div>`;
-    $("preview-card").style.display="block";
-    $("preview-fname").textContent=d.filename;
-    $("prvst").innerHTML=`
-      <div class="ps"><div class="psv">${d.rows.toLocaleString()}</div><div class="psl">Total Rows</div></div>
-      <div class="ps"><div class="psv">${d.columns}</div><div class="psl">Columns</div></div>
-      <div class="ps"><div class="psv" style="color:var(--red)">${d.churn_count.toLocaleString()}</div><div class="psl">Churn Records</div></div>
-      <div class="ps"><div class="psv" style="color:var(--red)">${d.churn_rate}%</div><div class="psl">Churn Rate</div></div>
-      <div class="ps"><div class="psv" style="color:var(--blue)">${(d.cat_cols||[]).length}</div><div class="psl">Categorical Cols</div></div>
-      <div class="ps"><div class="psv" style="color:var(--teal)">${(d.num_cols||[]).length}</div><div class="psl">Numerical Cols</div></div>`;
+    upbtn.textContent="Upload Dataset";upbtn.disabled=false;
+    if(d.error){$("aerr").textContent=d.error;$("aerr").classList.add("show");$("target-card").style.display="none";return}
+    upData=d;
+    let msg=`Uploaded — ${d.rows.toLocaleString()} rows, ${d.columns} columns. Now confirm the target column below.`;
+    if(d.duplicate_ids)msg+=` Note: ${d.duplicate_ids} rows share a duplicate ${d.id_col} and will be removed (first kept).`;
+    $("aok").textContent=msg;$("aok").classList.add("show");
+    renderTargetCard(d);
   }catch(e){
     upbtn.textContent="Upload Dataset";upbtn.disabled=false;
     $("aerr").textContent="Upload failed: "+e.message;$("aerr").classList.add("show");
   }
 });
 
+function renderTargetCard(d){
+  const rec=d.recommendation||{};
+  const pre=rec.confidence==="high"?rec.column:null;   // only pre-select when unambiguous
+  let h="";
+  if(rec.column){
+    h+=rec.confidence==="high"
+      ?`<div class="alert aok show">Recommended: <b>${esc(rec.column)}</b> (churn = <b>${esc(rec.positive)}</b>). ${esc(rec.reason)} Please confirm below.</div>`
+      :`<div class="alert awarn show"><b>Target is ambiguous.</b> ${esc(rec.reason)} Pick the correct column and the value that means churn.</div>`;
+  }else{
+    h+=`<div class="alert aerr show">No valid target column found. See the issues listed below.</div>`;
+  }
+  h+=`<div class="tcl">`+
+    d.candidates.map((c,i)=>{
+      const vals=c.values.slice(0,2).map(v=>`<span class="tcval">${esc(v.value)}: <b>${v.count.toLocaleString()}</b> (${v.pct}%)</span>`).join("");
+      const notes=(c.valid?(c.name_score>=70?"name looks like a target · ":"")+(c.positive_recognized?"labels recognised":"labels not recognised"):"")
+        +(c.issues||[]).map(x=>`<div class="iss">${esc(x)}</div>`).join("");
+      return `<label class="tcc ${c.valid?"":"bad"}"><input type="radio" name="tcol" value="${i}" ${c.valid?"":"disabled"} ${c.column===pre?"checked":""}>
+        <div class="tcm"><div class="tcn">${esc(c.column)}</div><div class="tcv">${vals}</div><div class="tcnote">${notes}</div></div></label>`;
+    }).join("")+`</div>`;
+  h+=`<div class="tcpos" id="tc-pos"></div>
+      <div id="tc-warn"></div>
+      <button class="upbtn" id="tc-confirm" disabled>Confirm target &amp; continue</button>`;
+  $("tc-body").innerHTML=h;
+  $("target-card").style.display="block";
+  $("tc-body").querySelectorAll('input[name=tcol]').forEach(el=>el.addEventListener("change",onColPick));
+  const chk=$("tc-body").querySelector('input[name=tcol]:checked');
+  if(chk)onColPick({target:chk});
+  $("tc-confirm").addEventListener("click",confirmTarget);
+}
+
+function onColPick(e){
+  setConfirmed(false);$("schema-card").style.display="none";
+  const c=upData.candidates[+e.target.value];
+  const sugg=c.suggested_positive;
+  $("tc-pos").style.display="block";
+  $("tc-pos").innerHTML=`<div style="font-size:12px;font-weight:600;margin-bottom:8px">Which value means the customer churned? <span style="color:var(--t3);font-weight:400">(becomes class 1)</span></div>`+
+    c.values.slice(0,2).map(v=>`<label><input type="radio" name="tpos" value="${esc(v.value)}" ${v.value===sugg?"checked":""}> ${esc(v.value)} <span style="color:var(--t3)">(${v.count.toLocaleString()})</span></label>`).join("")+
+    `<div id="tc-dist"></div><div style="font-size:11px;color:var(--t3)">${esc(c.positive_reason||"")}</div>`;
+  $("tc-pos").querySelectorAll('input[name=tpos]').forEach(el=>el.addEventListener("change",()=>{setConfirmed(false);$("schema-card").style.display="none";showDist(c)}));
+  showDist(c);
+  $("tc-confirm").disabled=false;
+}
+
+function showDist(c){
+  const p=$("tc-pos").querySelector('input[name=tpos]:checked');if(!p)return;
+  const pos=c.values.find(v=>v.value===p.value),neg=c.values.find(v=>v.value!==p.value);
+  const tot=pos.count+neg.count;
+  $("tc-dist").innerHTML=`<div class="distbar"><span style="width:${pos.count/tot*100}%;background:var(--red)"></span><span style="width:${neg.count/tot*100}%;background:var(--blue)"></span></div>
+    <div style="font-size:12px"><b style="color:var(--red)">Churn: ${pos.count.toLocaleString()} (${(pos.count/tot*100).toFixed(1)}%)</b> &nbsp; <b style="color:var(--blue)">Not churn: ${neg.count.toLocaleString()} (${(neg.count/tot*100).toFixed(1)}%)</b></div>`;
+}
+
+async function confirmTarget(){
+  const col=$("tc-body").querySelector('input[name=tcol]:checked'),pos=$("tc-body").querySelector('input[name=tpos]:checked');
+  if(!col||!pos)return;
+  const c=upData.candidates[+col.value];
+  $("tc-confirm").disabled=true;$("tc-confirm").textContent="Checking...";
+  const r=await fetch("/api/confirm_target",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target_col:c.column,positive_label:pos.value})}).then(x=>x.json()).catch(e=>({error:e.message}));
+  $("tc-confirm").disabled=false;$("tc-confirm").textContent="Confirm target & continue";
+  if(r.error){$("tc-warn").innerHTML=`<div class="alert aerr show" style="margin-top:10px">${esc(r.error)}</div>`;return}
+  $("tc-warn").innerHTML=`<div class="alert aok show" style="margin-top:10px">Confirmed: <b>${esc(r.target_col)}</b> = "${esc(r.positive_label)}" is churn (${r.n_positive.toLocaleString()} churners, ${r.churn_rate}%). You can now run the pipeline.</div>`+
+    (r.warnings||[]).map(w=>`<div class="alert awarn show">${esc(w)}</div>`).join("");
+  showSchema(r,upData);setConfirmed(true);
+}
+
+function showSchema(r,d){
+  $("schema-card").style.display="block";
+  $("schema-body").innerHTML=`
+    <div style="margin-bottom:10px">
+      <span class="sctag sc-tgt">Target: ${esc(r.target_col)} = "${esc(r.positive_label)}"</span>
+      ${r.id_col?`<span class="sctag sc-id">ID: ${esc(r.id_col)}</span>`:""}
+    </div>
+    <div style="margin-bottom:6px;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.7px">Categorical Features (${(r.cat_cols||[]).length})</div>
+    <div style="margin-bottom:10px">${(r.cat_cols||[]).map(c=>`<span class="sctag sc-cat">${esc(c)}</span>`).join("")||'<span style="color:var(--t3);font-size:12px">None detected</span>'}</div>
+    <div style="margin-bottom:6px;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.7px">Numerical Features (${(r.num_cols||[]).length})</div>
+    <div>${(r.num_cols||[]).map(c=>`<span class="sctag sc-num">${esc(c)}</span>`).join("")||'<span style="color:var(--t3);font-size:12px">None detected</span>'}</div>`;
+  if(d){
+    $("preview-card").style.display="block";
+    $("preview-fname").textContent=d.filename;
+    $("prvst").innerHTML=`
+      <div class="ps"><div class="psv">${d.rows.toLocaleString()}</div><div class="psl">Total Rows</div></div>
+      <div class="ps"><div class="psv">${d.columns}</div><div class="psl">Columns</div></div>
+      <div class="ps"><div class="psv" style="color:var(--red)">${r.n_positive.toLocaleString()}</div><div class="psl">Churn Records</div></div>
+      <div class="ps"><div class="psv" style="color:var(--red)">${r.churn_rate}%</div><div class="psl">Churn Rate</div></div>
+      <div class="ps"><div class="psv" style="color:var(--blue)">${(r.cat_cols||[]).length}</div><div class="psl">Categorical Cols</div></div>
+      <div class="ps"><div class="psv" style="color:var(--teal)">${(r.num_cols||[]).length}</div><div class="psl">Numerical Cols</div></div>`;
+  }
+}
+
+// If a confirmed selection already exists for the stored CSV (page reload), re-enable the run button
+get("/api/schema_state").then(s=>{
+  if(s&&s.confirmed&&s.selection){
+    setConfirmed(true);
+    $("aok").textContent=`Using previously confirmed target: ${s.selection.target_col} = "${s.selection.positive_label}" (upload a new file to change it).`;
+    $("aok").classList.add("show");
+  }
+}).catch(()=>{});
+
 // Pipeline
 let polling=null;
 $("runbtn").addEventListener("click",async()=>{
   $("runbtn").disabled=true;$("runbtn").textContent="Starting...";
-  $("pipeprg").style.display="block";$("resgrid").style.display="none";
+  $("pipeprg").style.display="block";$("resgrid").style.display="none";$("lbd").innerHTML="";
   $("logbox").innerHTML="";$("prgbar").style.width="0%";$("stgtxt").textContent="Initialising...";
   const r=await fetch("/api/run_pipeline",{method:"POST"}).then(x=>x.json()).catch(e=>({error:e.message}));
-  if(r.error){$("stgtxt").textContent="Error: "+r.error;$("runbtn").disabled=false;$("runbtn").textContent="Run Full Pipeline";return}
+  if(r.error){$("stgtxt").textContent="Error: "+r.error;$("runbtn").disabled=!tgtConfirmed;$("runbtn").textContent="Run Full Pipeline";return}
   polling=setInterval(pollStatus,1500);
 });
 
@@ -756,18 +946,22 @@ async function pollStatus(){
   $("logbox").scrollTop=$("logbox").scrollHeight;
   if(!s.running){
     clearInterval(polling);
-    $("runbtn").disabled=false;$("runbtn").textContent="Run Full Pipeline";
+    $("runbtn").disabled=!tgtConfirmed;$("runbtn").textContent="Run Full Pipeline";
     if(s.done){
       $("stgtxt").textContent="Pipeline complete — navigate to Overview to see results.";
       const sum=await get("/api/summary").catch(()=>({}));
       if(sum.total_scored){
+        const pc=v=>((v||0)*100).toFixed(1)+"%",cm=sum.confusion_matrix||{};
         $("resgrid").style.display="grid";
         $("resgrid").innerHTML=`
           <div class="resbox"><div class="resv">${sum.total_scored.toLocaleString()}</div><div class="resl">Records Scored</div></div>
-          <div class="resbox"><div class="resv">${sum.churn_rate}%</div><div class="resl">Predicted Churn</div></div>
-          <div class="resbox"><div class="resv">${((sum.accuracy||0)*100).toFixed(1)}%</div><div class="resl">Accuracy</div></div>
-          <div class="resbox"><div class="resv">${(sum.high_risk||0).toLocaleString()}</div><div class="resl">High Risk</div></div>`;
+          <div class="resbox"><div class="resv">${pc(sum.accuracy)}</div><div class="resl">Accuracy (test)</div></div>
+          <div class="resbox"><div class="resv">${pc(sum.precision)}</div><div class="resl">Precision</div></div>
+          <div class="resbox"><div class="resv">${pc(sum.recall)}</div><div class="resl">Recall (churners caught)</div></div>
+          <div class="resbox"><div class="resv">${pc(sum.f1)}</div><div class="resl">F1</div></div>
+          <div class="resbox"><div class="resv">${cm.tp!=null?`${cm.tp} / ${cm.fn}`:"—"}</div><div class="resl">Caught / Missed churners</div></div>`;
       }
+      if(s.leaderboard)$("lbd").innerHTML=leaderboardHTML(s.leaderboard,s.selection_note);
     }else if(s.error){
       $("stgtxt").textContent="Pipeline failed — check the log above for details.";
     }
