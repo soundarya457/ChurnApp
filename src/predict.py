@@ -1,5 +1,10 @@
 """
-predict.py — Predict for ALL rows. Label confirmed churners separately.
+predict.py — Score ALL rows and store them by customer ID.
+
+Customer IDs travel with the data from the upload (they are the index/columns
+of the objects passed in), so nothing is re-read from the database by position
+and nothing is truncated: any length or ID mismatch raises instead of silently
+trimming.
 """
 import numpy as np
 import pandas as pd
@@ -8,7 +13,7 @@ from src.config import DB_URL, SCHEMA
 import logging
 
 log = logging.getLogger(__name__)
-ID_COL = "CLIENTNUM"
+ID_COL = "CLIENTNUM"   # DB column name for the customer ID (value comes from SCHEMA['id_col'])
 
 
 def assign_risk(proba, actual):
@@ -20,53 +25,40 @@ def assign_risk(proba, actual):
     return "Low"
 
 
-def batch_predict_all(best_name, best_model, X_full, y_full):
-    log.info(f"  Predicting all {len(X_full):,} records...")
+def batch_predict_all(best_name, best_model, data):
+    X_full, y_full = data["X_full"], data["y_full"]
+    ids, split = data["ids_full"], data["split_full"]
+    n = len(X_full)
+    log.info(f"  Predicting all {n:,} records...")
 
-    # Predict in chunks
-    X_arr = X_full.values if hasattr(X_full, "values") else np.array(X_full)
-    all_probas, all_preds = [], []
-    for start in range(0, len(X_arr), 500):
-        chunk  = X_arr[start:start+500]
-        probas = best_model.predict_proba(chunk)[:, 1]
-        preds  = best_model.predict(chunk)
-        all_probas.extend(probas.tolist())
-        all_preds.extend(preds.tolist())
+    if not (len(y_full) == len(ids) == len(split) == n):
+        raise ValueError(f"Length mismatch: X={n} y={len(y_full)} ids={len(ids)} split={len(split)}")
+    if not (X_full.index.equals(y_full.index) and X_full.index.equals(ids.index)
+            and X_full.index.equals(split.index)):
+        raise ValueError("Row identifiers of X / y / IDs / split are not aligned.")
+    if ids.isna().any() or ids.duplicated().any():
+        raise ValueError("Customer IDs must be present and unique before storing predictions.")
 
-    # Get IDs in same order as X_full (use index to match)
-    engine = create_engine(DB_URL, echo=False)
-    id_col = SCHEMA.get("id_col")
-    try:
-        # Read ALL IDs ordered by table row — must match X_full order
-        order_col = "_source_row" if "_source_row" in pd.read_sql(
-            "SELECT * FROM features LIMIT 0", con=engine).columns else None
-        order_sql = f" ORDER BY `{order_col}`" if order_col else ""
-        id_df = pd.read_sql(
-            f"SELECT `{id_col}` FROM features{order_sql} LIMIT {len(X_full)}",
-            con=engine
-        )
-        client_ids = id_df[id_col].astype(str).tolist()
-    except Exception:
-        client_ids = [str(i) for i in range(1, len(X_full)+1)]
+    probas, preds = [], []
+    for start in range(0, n, 500):
+        chunk = X_full.iloc[start:start+500]
+        probas.append(best_model.predict_proba(chunk)[:, 1])
+        preds.append(best_model.predict(chunk))
+    probas, preds = np.concatenate(probas), np.concatenate(preds)
+    if len(probas) != n:
+        raise ValueError("Prediction count differs from input row count.")
 
-    y_vals = y_full.values.tolist() if hasattr(y_full, "values") else list(y_full)
-
-    # Ensure all same length
-    n = min(len(client_ids), len(all_probas), len(y_vals))
-    client_ids = client_ids[:n]
-    all_probas = all_probas[:n]
-    all_preds  = all_preds[:n]
-    y_vals     = y_vals[:n]
-
+    y_vals = y_full.to_numpy()
     df = pd.DataFrame({
-        ID_COL:            client_ids,
-        "churn_actual":    [int(v) for v in y_vals],
-        "churn_proba":     [round(float(p), 4) for p in all_probas],
-        "churn_predicted": [int(p) for p in all_preds],
-        "risk_segment":    [assign_risk(p, v) for p, v in zip(all_probas, y_vals)],
+        ID_COL:            ids.to_numpy(),
+        "source_row":      X_full.index.to_numpy().astype(np.int64),
+        "data_split":      split.to_numpy(),
+        "churn_actual":    y_vals.astype(int),
+        "churn_proba":     np.round(probas.astype(float), 4),
+        "churn_predicted": preds.astype(int),
+        "risk_segment":    [assign_risk(p, v) for p, v in zip(probas, y_vals)],
         "model_name":      best_name,
     })
-
     log.info(f"  Total predicted: {len(df):,} | Segments: {df['risk_segment'].value_counts().to_dict()}")
     return df
 
@@ -78,16 +70,19 @@ def write_predictions(df):
         conn.execute(text("""
             CREATE TABLE churn_predictions (
                 id              INT AUTO_INCREMENT PRIMARY KEY,
-                CLIENTNUM       VARCHAR(100),
+                CLIENTNUM       VARCHAR(100) NOT NULL,
+                source_row      BIGINT,
+                data_split      VARCHAR(10),
                 churn_actual    TINYINT,
                 churn_proba     DECIMAL(6,4),
                 churn_predicted TINYINT,
                 risk_segment    VARCHAR(10),
                 model_name      VARCHAR(40),
                 scored_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_cid (CLIENTNUM),
                 INDEX idx_seg   (risk_segment),
                 INDEX idx_proba (churn_proba),
-                INDEX idx_cid   (CLIENTNUM)
+                INDEX idx_split (data_split)
             )
         """))
     rows = df.to_dict(orient="records")
@@ -95,9 +90,9 @@ def write_predictions(df):
         for start in range(0, len(rows), 500):
             conn.execute(text("""
                 INSERT INTO churn_predictions
-                (CLIENTNUM,churn_actual,churn_proba,churn_predicted,risk_segment,model_name)
+                (CLIENTNUM,source_row,data_split,churn_actual,churn_proba,churn_predicted,risk_segment,model_name)
                 VALUES
-                (:CLIENTNUM,:churn_actual,:churn_proba,:churn_predicted,:risk_segment,:model_name)
+                (:CLIENTNUM,:source_row,:data_split,:churn_actual,:churn_proba,:churn_predicted,:risk_segment,:model_name)
             """), rows[start:start+500])
     log.info(f"  Written {len(df):,} predictions ✓")
 
@@ -129,23 +124,27 @@ def write_shap(shap_df):
     log.info(f"  Written {len(shap_df):,} SHAP rows ✓")
 
 
-def run(best_name, best_model, X_test, y_test, test_ids, shap_df,
-        X_full=None, y_full=None):
+def verify_stored(pred_df):
+    """Re-read the DB and confirm every stored prediction matches a raw_data customer by ID."""
+    engine = create_engine(DB_URL, echo=False)
+    id_col = SCHEMA["id_col"]
+    with engine.connect() as conn:
+        n_pred = conn.execute(text("SELECT COUNT(*) FROM churn_predictions")).scalar()
+        n_join = conn.execute(text(
+            f"SELECT COUNT(*) FROM churn_predictions p JOIN raw_data r "
+            f"ON CAST(r.`{id_col}` AS CHAR) = p.CLIENTNUM")).scalar()
+        n_raw = conn.execute(text("SELECT COUNT(*) FROM raw_data")).scalar()
+    if not (n_pred == n_join == n_raw == len(pred_df)):
+        raise RuntimeError(
+            f"ID alignment check FAILED: predictions={n_pred}, matched to raw_data by ID={n_join}, "
+            f"raw rows={n_raw}, scored={len(pred_df)}")
+    log.info(f"  ID alignment verified: {n_pred:,} predictions ↔ {n_raw:,} customers ✓")
+
+
+def run(best_name, best_model, data, shap_df):
     log.info("Writing predictions...")
-    if X_full is not None and y_full is not None:
-        pred_df = batch_predict_all(best_name, best_model, X_full, y_full)
-    else:
-        yp  = best_model.predict_proba(X_test)[:, 1]
-        yh  = best_model.predict(X_test)
-        y_v = y_test.values.tolist()
-        pred_df = pd.DataFrame({
-            ID_COL:            [str(c) for c in test_ids],
-            "churn_actual":    [int(v) for v in y_v],
-            "churn_proba":     [round(float(p),4) for p in yp],
-            "churn_predicted": yh.tolist(),
-            "risk_segment":    [assign_risk(p,v) for p,v in zip(yp, y_v)],
-            "model_name":      best_name,
-        })
+    pred_df = batch_predict_all(best_name, best_model, data)
     write_predictions(pred_df)
     write_shap(shap_df)
+    verify_stored(pred_df)
     return pred_df
